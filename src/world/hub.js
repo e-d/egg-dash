@@ -76,7 +76,7 @@ export class Hub {
     const altar = new THREE.Group();
     altar.position.set(A.x, 0, A.z);
     g.add(altar);
-    const stoneM = mat(0xf2ecff, { roughness: 0.5 });
+    const stoneM = mat(0xcfc6e6, { roughness: 0.55 });
     altar.add(mesh(new THREE.CylinderGeometry(4.2, 4.6, 0.5, 8), stoneM, { y: 0.25 }));
     altar.add(mesh(new THREE.CylinderGeometry(3.0, 3.3, 0.5, 8), stoneM, { y: 0.75 }));
     altar.add(mesh(new THREE.CylinderGeometry(1.4, 1.8, 1.2, 8), mat(0xd9ccff, { roughness: 0.4 }), { y: 1.5 }));
@@ -219,7 +219,7 @@ export class Hub {
       this.divineEggMat.emissiveIntensity = 0.45 + Math.sin(t * 4) * 0.2;
       this.divineHalo.rotation.z = t;
       this.pillar.material.opacity = 0.06 + Math.sin(t * 2) * 0.02;
-      this.divineLight.intensity = 90;
+      this.divineLight.intensity = 55;
       if (Math.random() < dt * 34) {
         const a = Math.random() * Math.PI * 2, r = 1 + Math.random() * 3;
         particles.emit({ x: WORLD.altar.x + Math.cos(a) * r, y: 1 + Math.random(), z: WORLD.altar.z + Math.sin(a) * r, vx: -Math.cos(a) * 0.4, vy: 3 + Math.random() * 4, vz: -Math.sin(a) * 0.4,

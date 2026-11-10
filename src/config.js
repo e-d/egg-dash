@@ -107,10 +107,10 @@ export const PETS = {
   unicorn:  { name: 'Unicorn',  rarity: 'legendary', body: 'round', main: 0xfff5ff, belly: 0xffe0f7, ears: 'pointy', horn: 0xffd23f, mane: true },
   phoenix:  { name: 'Phoenix',  rarity: 'legendary', body: 'tall',  main: 0xff4d1a, belly: 0xffd23f, ears: 'none', beak: 0xffe14a, wings: 'feather', flame: true },
   // ── DIVINE (night-only event) ──
-  d_dragon: { name: 'Divine Dragon',     rarity: 'divine', body: 'long',  main: 0xfff4d6, belly: 0xffd66b, ears: 'none', horns: 0xffd23f, wings: 'bat', tail: 'spike' },
-  d_unicorn:{ name: 'Celestial Unicorn', rarity: 'divine', body: 'round', main: 0xf3f0ff, belly: 0xd8ccff, ears: 'pointy', horn: 0xfff4b0, mane: true },
-  d_phoenix:{ name: 'Seraph Phoenix',    rarity: 'divine', body: 'tall',  main: 0xfffbea, belly: 0xffe58a, ears: 'none', beak: 0xffd23f, wings: 'feather', flame: true },
-  d_kitty:  { name: 'Astral Kitty',      rarity: 'divine', body: 'round', main: 0xe9e4ff, belly: 0xffffff, ears: 'pointy', tail: 'long', whiskers: true },
+  d_dragon: { name: 'Divine Dragon',     rarity: 'divine', body: 'long',  main: 0xffc94a, belly: 0xfff3c4, ears: 'none', horns: 0xffffff, wings: 'bat', tail: 'spike' },
+  d_unicorn:{ name: 'Celestial Unicorn', rarity: 'divine', body: 'round', main: 0xd9c8ff, belly: 0xffffff, ears: 'pointy', horn: 0xfff4b0, mane: true },
+  d_phoenix:{ name: 'Seraph Phoenix',    rarity: 'divine', body: 'tall',  main: 0xffe08a, belly: 0xffffff, ears: 'none', beak: 0xffd23f, wings: 'feather', flame: true },
+  d_kitty:  { name: 'Astral Kitty',      rarity: 'divine', body: 'round', main: 0xa98bff, belly: 0xf3eeff, ears: 'pointy', tail: 'long', whiskers: true },
 };
 
 // ── Hatchable eggs (Hatchery) ───────────────────────────────────

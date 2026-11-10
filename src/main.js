@@ -443,6 +443,10 @@ class Game {
       if (b.ghost || b.h < 2.5 || y > b.h) continue;
       if (x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ) return true;
     }
+    for (const c of this.colliders.circles) {
+      if (!c.camR || y < c.camY0 || y > c.camY1) continue;
+      if ((x - c.x) ** 2 + (z - c.z) ** 2 < c.camR * c.camR) return true;
+    }
     for (const b of this.colliders.camBoxes) {
       if (y < b.minY || y > b.maxY) continue;
       if (x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ) return true;
@@ -547,6 +551,7 @@ async function boot() {
   } catch { /* fonts optional */ }
   const game = new Game();
   window.game = game; // handy for debugging in the console
+  if (DEBUG) window.state = state;
   game.preview.prewarm();
   game.hud.renderEquip();
   game.loop();

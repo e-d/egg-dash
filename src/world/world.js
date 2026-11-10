@@ -118,7 +118,7 @@ export function buildWorld({ scene, colliders, daynight }) {
     const y0 = t.outer ? terrainHeight(t.x, t.z, H) : 0;
     m4.compose(p3.set(t.x, y0, t.z), q.identity(), sc.setScalar(t.s));
     trunks.setMatrixAt(i, m4);
-    if (!t.outer) colliders.circle(t.x, t.z, 0.6 * t.s, 12);
+    if (!t.outer) colliders.circle(t.x, t.z, 0.6 * t.s, 12, { camR: 2.1 * t.s, camY0: 1.6 * t.s, camY1: 7 * t.s });
   });
   const col = new THREE.Color();
   round.forEach((t, i) => {

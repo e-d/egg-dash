@@ -9,7 +9,7 @@ const S = (r, w = 20, h = 14) => new THREE.SphereGeometry(r, w, h);
 function m(color, divine, extra = {}) {
   return new THREE.MeshStandardMaterial({
     color, roughness: 0.5, metalness: divine ? 0.25 : 0,
-    emissive: divine ? color : 0x000000, emissiveIntensity: divine ? 0.35 : 0, ...extra,
+    emissive: divine ? color : 0x000000, emissiveIntensity: divine ? 0.12 : 0, ...extra,
   });
 }
 
@@ -142,7 +142,7 @@ export function buildPet(species) {
   const wings = [];
   if (def.wings || divine) {
     const type = def.wings || 'feather';
-    const wm = divine ? new THREE.MeshStandardMaterial({ color: 0xfff3c4, emissive: 0xffd66b, emissiveIntensity: 1.1, roughness: 0.3, side: THREE.DoubleSide })
+    const wm = divine ? new THREE.MeshStandardMaterial({ color: 0xfff3c4, emissive: 0xffc94a, emissiveIntensity: 0.55, roughness: 0.3, side: THREE.DoubleSide })
                       : m(type === 'bat' ? def.main : def.belly, false, { side: THREE.DoubleSide });
     for (const s of [-1, 1]) {
       const w = new THREE.Group();
@@ -173,11 +173,11 @@ export function buildPet(species) {
   // divine adornments
   let halo = null, aura = null;
   if (divine) {
-    halo = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.04, 8, 32), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffe58a, emissiveIntensity: 3.5 }));
+    halo = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.04, 8, 32), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffd66b, emissiveIntensity: 2.4 }));
     halo.rotation.x = Math.PI / 2;
     halo.position.set(0, headR + 0.35, 0);
     head.add(halo);
-    aura = makeGlowSprite(0xffe9a0, 3.2, 0.55);
+    aura = makeGlowSprite(0xffe9a0, 2.6, 0.28);
     aura.position.y = 0.8;
     g.add(aura);
   } else if (def.rarity === 'legendary') {
@@ -249,10 +249,10 @@ export class PetFollowers {
       }
       if (ud.halo) ud.halo.rotation.z = t;
       // auras
-      if (ud.divine && Math.random() < dt * 40) {
+      if (ud.divine && Math.random() < dt * 16) {
         const a = Math.random() * Math.PI * 2;
         particles.emit({ x: f.model.position.x + Math.cos(a) * 0.6, y: f.model.position.y + 0.3 + Math.random() * 1.2, z: f.model.position.z + Math.sin(a) * 0.6,
-          vx: Math.cos(a) * 0.3, vy: 1.4, vz: Math.sin(a) * 0.3, color: Math.random() < 0.5 ? 0xfff2b0 : 0xd9b8ff, color2: 0xffd66b, size: 0.32, life: 1.3, intensity: 3.5, twinkle: true });
+          vx: Math.cos(a) * 0.3, vy: 1.4, vz: Math.sin(a) * 0.3, color: Math.random() < 0.5 ? 0xffd66b : 0xb48cff, color2: 0xffffff, size: 0.26, life: 1.2, intensity: 2.2, twinkle: true });
       } else if (ud.def.rarity === 'legendary' && Math.random() < dt * 10) {
         particles.emit({ x: f.model.position.x + (Math.random() - 0.5), y: f.model.position.y + 0.4 + Math.random(), z: f.model.position.z + (Math.random() - 0.5),
           vy: 0.8, color: 0xffc94a, size: 0.2, life: 1, intensity: 2.5, twinkle: true });
