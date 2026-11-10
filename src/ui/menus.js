@@ -230,7 +230,7 @@ export class Menus {
     const s = state.data.settings, d = state.data;
     const q = (k, label) => `<button class="${s.quality === k ? 'on' : ''}" data-act="quality" data-arg="${k}">${label}</button>`;
     return `<div class="settings-list">
-      <div class="setting">Graphics quality <div class="seg">${q('auto', 'Auto')}${q('low', 'Low')}${q('medium', 'Medium')}${q('high', 'High (AO)')}</div></div>
+      <div class="setting">Graphics quality <div class="seg">${q('auto', 'Auto')}${q('low', 'Low')}${q('medium', 'Medium')}${q('high', 'High (AO)')}${q('ultra', 'Ultra')}</div></div>
       <div class="setting">Music <input type="range" min="0" max="1" step="0.05" value="${s.music}" data-setting="music"></div>
       <div class="setting">Sound effects <input type="range" min="0" max="1" step="0.05" value="${s.sfx}" data-setting="sfx"></div>
       <div class="setting">Show FPS <div class="seg"><button class="${s.showFps ? 'on' : ''}" data-act="fps">${s.showFps ? 'On' : 'Off'}</button></div></div>

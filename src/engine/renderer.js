@@ -21,9 +21,10 @@ class FxAwareGTAOPass extends GTAOPass {
 }
 
 export const QUALITY = {
-  low:    { pixelRatio: 1,    shadows: 1024, ao: false, bloom: true,  smaa: false },
-  medium: { pixelRatio: 1.25, shadows: 2048, ao: false, bloom: true,  smaa: true },
-  high:   { pixelRatio: 2,    shadows: 2048, ao: true,  bloom: true,  smaa: true },
+  low:    { pixelRatio: 1,    shadows: 1024, ao: false, bloom: true, smaa: false },
+  medium: { pixelRatio: 1.25, shadows: 2048, ao: false, bloom: true, smaa: true },
+  high:   { pixelRatio: 1.5,  shadows: 2048, ao: true,  bloom: true, smaa: true, aoSamples: 8,  pdSamples: 6 },
+  ultra:  { pixelRatio: 2,    shadows: 4096, ao: true,  bloom: true, smaa: true, aoSamples: 16, pdSamples: 12 },
 };
 
 export class Renderer {
@@ -82,6 +83,10 @@ export class Renderer {
     this.q = q;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pixelRatio));
     this.gtao.enabled = q.ao;
+    if (q.ao) {
+      this.gtao.updateGtaoMaterial({ samples: q.aoSamples });
+      this.gtao.updatePdMaterial({ samples: q.pdSamples });
+    }
     this.bloom.enabled = q.bloom;
     this.smaa.enabled = q.smaa;
     this.shadowSize = q.shadows;
@@ -98,8 +103,8 @@ export class Renderer {
     if (this.autoTimer > 7) {
       const avg = this.fpsSamples.reduce((a, b) => a + b, 0) / this.fpsSamples.length;
       const fps = 1 / avg;
-      if (fps < 32 && this.level === 'high') { this.setQuality('medium', true); this.autoTimer = 1.5; this.fpsSamples = []; return; }
-      if (fps < 32 && this.level === 'medium') this.setQuality('low', true);
+      if (fps < 30 && this.level === 'high') { this.setQuality('medium', true); this.autoTimer = 1.5; this.fpsSamples = []; return; }
+      if (fps < 30 && this.level === 'medium') this.setQuality('low', true);
       this.autoDecided = true;
     }
   }

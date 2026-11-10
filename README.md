@@ -30,6 +30,15 @@ npm run preview    # serves dist/ at http://localhost:4173
 
 > Opening `index.html` straight from disk (`file://`) won't work, because browsers block ES-module imports there. Use `npm run dev` or serve the folder.
 
+### Play it online with GitHub Pages (optional)
+
+The repo includes `.github/workflows/pages.yml`. To publish:
+
+1. In the repo, go to **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**.
+2. Go to **Actions → Deploy to GitHub Pages → Run workflow**.
+
+The game will be served at `https://<user>.github.io/egg-dash/`. To redeploy on every commit, add a `push:` trigger to the workflow.
+
 ---
 
 ## 🎮 Controls
@@ -83,7 +92,7 @@ Faster vaults have faster guards, so you'll need Speed to outrun them. Sneaking 
 | **Visuals** | Stylized low-poly world with PBR materials, soft PCF shadows that follow the player, **GTAO ambient occlusion**, **Unreal bloom**, SMAA, ACES tone mapping, a gradient sky with sun, moon, twinkling stars and aurora, fog transitions, and neon that switches on at night (lamps, signs, vault trims). |
 | **UI** | Arcade HUD: cycle timer, Cash, Speed (+rate), walk speed, multiplier, equipped pets and trail, rotating minimap, prompts, toasts, floating +cash/+speed numbers, an alarm vignette while chased, and sleek shop modals. |
 
-Also included: a synthesized soundtrack and SFX (WebAudio, nothing to download), autosave to `localStorage`, a first-run tutorial, **Auto/Low/Medium/High** graphics with automatic downgrade on slow machines, touch controls, and a stats page.
+Also included: a synthesized soundtrack and SFX (WebAudio, nothing to download), autosave to `localStorage`, a first-run tutorial, **Auto / Low / Medium / High (GTAO) / Ultra** graphics with automatic downgrade on slow machines, touch controls, and a stats page.
 
 ---
 
