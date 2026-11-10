@@ -66,6 +66,7 @@ export function buildWorld({ scene, colliders, daynight }) {
   const stoneDark = mat(0xcbb994, { roughness: 0.9 });
   const plaza = mesh(new THREE.CylinderGeometry(30, 30, 0.12, 64), stone, { y: 0.06, cast: false });
   group.add(plaza);
+  colliders.circle(0, 0, 30, 0.12);
   const plazaRing = mesh(new THREE.TorusGeometry(30, 0.5, 6, 64), stoneDark, { y: 0.1, rx: Math.PI / 2, cast: false });
   group.add(plazaRing);
   // tile pattern ring

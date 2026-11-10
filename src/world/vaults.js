@@ -47,6 +47,7 @@ export class Vaults {
     // floor
     const floorMat = theme === 'neon' ? new THREE.MeshStandardMaterial({ color: def.floor, roughness: 0.35, metalness: 0.6 }) : mat(def.floor, { roughness: 0.95 });
     g.add(mesh(new THREE.BoxGeometry(S, 0.1, S), floorMat, { y: 0.05, cast: false }));
+    C.box(def.x, def.z, S, S, 0.1);
     if (theme === 'neon') {
       const grid = new THREE.GridHelper(S, 17, 0xff3dcf, 0x18f0ff);
       grid.position.y = 0.11; grid.material.transparent = true; grid.material.opacity = 0.5;
@@ -235,8 +236,8 @@ export class Vaults {
       const lavaMat = neonMat(0xff4a00, 2.6);
       this.daynight.registerNeon(lavaMat, true);
       for (const [x, z, w, d] of [[-h + 2.2, 0, 2.2, S - 8], [h - 2.2, 0, 2.2, S - 8], [0, -h + 2.2, S - 8, 2.2]]) {
-        g.add(mesh(new THREE.BoxGeometry(w, 0.06, d), lavaMat, { x, y: 0.12, z, cast: false }));
-        g.add(mesh(new THREE.BoxGeometry(w + 0.6, 0.25, d + 0.6), mat(0x1a0c0a, { flatShading: true }), { x, y: 0.08, z, cast: false }));
+        g.add(mesh(new THREE.BoxGeometry(w, 0.06, d), lavaMat, { x, y: 0.14, z, cast: false }));
+        g.add(mesh(new THREE.BoxGeometry(w + 0.6, 0.1, d + 0.6), mat(0x1a0c0a, { flatShading: true }), { x, y: 0.07, z, cast: false }));
       }
       for (let k = 0; k < 6; k++) {
         const x = (r() * 2 - 1) * (h - 6), z = (r() * 2 - 1) * (h - 6);
@@ -272,8 +273,12 @@ export class Vaults {
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.25, 32), ringMat);
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; ring.userData.noAO = true;
     group.add(ring);
+    // tall light beam so HUGE eggs can be spotted from across the map
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 16, 12, 1, true), new THREE.MeshBasicMaterial({ color: vault.def.color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    beam.position.y = 8.6; beam.userData.noAO = true;
+    group.add(beam);
     vault.group.add(group);
-    const egg = { vault, slot, group, mesh: m, halo, ring, nx, nz, huge: false, state: 'nest', timer: 0, hugeMat: null, wob: Math.random() * 10 };
+    const egg = { vault, slot, group, mesh: m, halo, ring, beam, nx, nz, huge: false, state: 'nest', timer: 0, hugeMat: null, wob: Math.random() * 10 };
     this.roll(egg);
     this.placeInNest(egg);
     return egg;
@@ -291,6 +296,8 @@ export class Vaults {
     egg.group.scale.setScalar(egg.huge ? 2.1 : 1);
     egg.halo.material.opacity = egg.huge ? 0.55 : 0;
     egg.ring.material.opacity = egg.huge ? 0.7 : 0;
+    egg.beam.visible = egg.huge;
+    egg.beam.material.opacity = egg.huge ? 0.22 : 0;
   }
 
   placeInNest(egg) {
@@ -403,6 +410,7 @@ export class Vaults {
         e.hugeMat.emissiveIntensity = 0.35 + pulse * 0.9;
         e.halo.material.opacity = 0.35 + pulse * 0.35;
         e.ring.rotation.z = t;
+        e.beam.material.opacity = 0.14 + pulse * 0.14;
         if (Math.random() < dt * 22) {
           const wx = e.vault.cx + e.nx, wz = e.vault.cz + e.nz;
           const a = Math.random() * Math.PI * 2;

@@ -31,6 +31,7 @@ export class Hub {
     pad.position.set(D.x, 0, D.z);
     g.add(pad);
     pad.add(mesh(new THREE.CylinderGeometry(D.radius + 0.6, D.radius + 0.9, 0.3, 48), mat(0x2b3a55, { metalness: 0.4, roughness: 0.4 }), { y: 0.15 }));
+    colliders.circle(D.x, D.z, D.radius + 0.7, 0.31);
     this.padMat = neonMat(0x3dff7a, 1.6);
     daynight.registerNeon(this.padMat, true);
     pad.add(mesh(new THREE.TorusGeometry(D.radius + 0.25, 0.14, 8, 64), this.padMat, { y: 0.31, rx: Math.PI / 2, cast: false }));

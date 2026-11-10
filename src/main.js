@@ -184,7 +184,11 @@ class Game {
   }
 
   hatch(eggId, n = 1, free = false) {
-    if (this.hatching) return;
+    if (this.hatching) {
+      // never drop a free (HUGE egg) hatch: retry once the current cinematic ends
+      if (free) setTimeout(() => this.hatch(eggId, n, true), 1200);
+      return;
+    }
     const egg = eggId === 'divine' ? DIVINE_EGG : EGGS.find((e) => e.id === eggId);
     if (!egg) return;
     if (egg.id === 'divine' && !this.daynight.divine) { audio.error(); this.hud.toast('The Divine Egg only appears during a DIVINE night!', 'bad'); return; }
@@ -503,6 +507,12 @@ class Game {
       if (egg.huge && Math.random() < dt * 25) this.particles.emit({ x: pl.pos.x + (Math.random() - 0.5) * 1.5, y: pl.pos.y + 2.4 + Math.random() * 1.5, z: pl.pos.z + (Math.random() - 0.5) * 1.5, vy: 1, color: Math.random() < 0.5 ? 0xffffff : egg.vault.def.color, size: 0.3, life: 1, intensity: 3, twinkle: true });
     }
     if (pl.jumped) { pl.jumped = false; audio.jump(); }
+    // footstep dust when sprinting & a puff on landing
+    if (this.started && pl.grounded && pl.horizSpeed > 9 && Math.random() < dt * pl.horizSpeed * 0.9) {
+      this.particles.emit({ x: pl.pos.x + (Math.random() - 0.5) * 0.6, y: pl.pos.y + 0.15, z: pl.pos.z + (Math.random() - 0.5) * 0.6, vx: -pl.vel.x * 0.08, vy: 0.8, vz: -pl.vel.z * 0.08, color: 0xd9c9a3, size: 0.45, sizeEnd: 0.9, life: 0.6, intensity: 0.35, drag: 2 });
+    }
+    if (pl.grounded && !this.wasGrounded && this.started) this.particles.burst(pl.pos.x, pl.pos.y + 0.1, pl.pos.z, 10, { color: 0xd9c9a3, speed: 3, life: 0.5, size: 0.5, sizeEnd: 0.8, gravity: 0, intensity: 0.35, hemi: true, up: 0.3 });
+    this.wasGrounded = pl.grounded;
 
     this.updateTraining(dt, steering);
     this.updateInteractions(dt);

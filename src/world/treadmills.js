@@ -50,6 +50,7 @@ export class Treadmills {
     // training floor: rubber mat with lanes
     const floor = mesh(new THREE.BoxGeometry(76, 0.1, 74), mat(0x34405c, { roughness: 0.95 }), { x: TREADMILL_AREA.x, y: 0.05, z: 0, cast: false });
     this.group.add(floor);
+    colliders.box(TREADMILL_AREA.x, 0, 76, 74, 0.1);
     const edge = mesh(new THREE.BoxGeometry(77, 0.14, 75), mat(0xe0a92a), { x: TREADMILL_AREA.x, y: 0.0, z: 0, cast: false });
     this.group.add(edge);
     // stripe lines between rows
@@ -242,7 +243,8 @@ export class Treadmills {
       g.add(glow);
     }
 
-    // walkable deck + console blocker
+    // walkable pad + deck + console blocker
+    colliders.box(x, z, LEN + 2, WID + 2, 0.19);
     colliders.box(x, z, LEN, WID, BELT_Y);
     colliders.box(x + LEN / 2 - 0.1, z, 0.6, WID, 2.6, { noWalk: true });
 

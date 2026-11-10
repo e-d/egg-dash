@@ -288,3 +288,42 @@ button { font-family: inherit; cursor: pointer; }
   #event-banner { font-size: 40px; } #event-banner.divine { font-size: 46px; }
   #busted div { font-size: 64px; }
 }
+
+/* ── short screens (phones in landscape) ── */
+@media (max-height: 520px) {
+  #stats { top: 8px; left: 8px; gap: 4px; }
+  .stat { font-size: 15px; min-width: 96px; padding: 3px 10px 3px 4px; border-radius: 12px; }
+  .stat .ico { width: 22px; height: 22px; font-size: 14px; border-radius: 7px; }
+  .stat small, .stat.walk, .stat.mult { display: none; }
+  #side-buttons { top: 86px; transform: none; left: 8px; gap: 6px; }
+  .side-btn { width: 46px; height: 46px; border-radius: 14px; border-width: 2px; }
+  .side-btn span { font-size: 20px; } .side-btn b { display: none; }
+  #cycle { top: 6px; padding: 4px 12px 10px 8px; min-width: 140px; border-width: 2px; }
+  #cycle-icon { font-size: 20px; } #cycle-time { font-size: 20px; } #cycle-label { font-size: 10px; }
+  #divine-tag { top: 58px; font-size: 12px; }
+  #carry-banner { top: 58px; font-size: 13px; padding: 5px 12px; }
+  #equip-bar { bottom: 8px; padding: 5px; gap: 5px; border-radius: 14px; }
+  .eq-slot { width: 40px; height: 40px; border-radius: 10px; }
+  .eq-slot.trail { min-width: 70px; font-size: 10px; }
+  #minimap { width: 104px; height: 104px; right: 8px; bottom: 8px; border-width: 3px; }
+  #touch-buttons { right: 124px; bottom: 12px; gap: 10px; }
+  #touch-buttons button { width: 58px; height: 58px; font-size: 24px; }
+  #prompt { bottom: 70px; font-size: 15px; padding: 6px 14px; }
+  #toasts { top: 8px; right: 8px; max-width: 260px; }
+  .toast { font-size: 12px; padding: 6px 10px; }
+  .modal { max-height: 94vh; border-radius: 18px; }
+  .modal-head { padding: 8px 12px; } .modal-head h2 { font-size: 22px; }
+  .close-btn { width: 34px; height: 34px; font-size: 16px; }
+  .title-card { padding: 10px; }
+  .logo { font-size: 56px; }
+  .tagline { font-size: 15px; margin: 4px 0 12px; }
+  #play-btn { font-size: 28px; padding: 8px 40px; }
+  .controls, .tips { display: none; }
+  #event-banner { font-size: 36px; } #event-banner.divine { font-size: 42px; } #event-banner small { font-size: 14px; }
+  #busted div { font-size: 60px; }
+  #hatch-canvas { width: 62vmin; height: 62vmin; }
+  #hatch-info h2 { font-size: 28px; } #hatch-info .rar { font-size: 18px; }
+}
+@media (pointer: coarse) {
+  .controls { display: none; }
+}
