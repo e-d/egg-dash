@@ -33,7 +33,7 @@ function beltTexture(def) {
 
 function makeSignTexture(def, owned) {
   const lines = owned
-    ? [`T${def.tier} • ${def.name}`, `+${formatNum(def.speedPerSec)} ⚡/s   +$${formatNum(def.cashPerSec)}/s`]
+    ? [`T${def.tier} • ${def.name}`, `+${formatNum(def.speedPerSec)} ⚡ Speed /s`]
     : [`🔒 T${def.tier} • ${def.name}`, `$${formatNum(def.cost)}  —  +${formatNum(def.speedPerSec)} ⚡/s`];
   const acc = '#' + new THREE.Color(def.accent).getHexString();
   return textTexture(lines, { w: 640, h: 180, bg: owned ? 'rgba(14,20,40,0.82)' : 'rgba(60,14,24,0.85)', border: owned ? acc : '#ff5a6e', size: 56, stroke: '#000a' });

@@ -1,6 +1,6 @@
 # 🥚 Egg Dash
 
-**A 3D browser egg-heist & training simulator.** Sneak into guarded vaults, steal eggs, sprint them home, train on 20 tiers of treadmills, collect glowing trails, and hatch pets. A night falls every 3 minutes, and on 1 night in 30 a **DIVINE** event brings a Divine Egg down onto the altar.
+**A 3D browser egg-heist & training simulator.** Train Speed on 20 tiers of treadmills, run down the long **Egg Lane**, grab an egg and outrun the guards back to your base. Placed eggs hatch into pets that earn cash every second. A night falls every 3 minutes, and on 1 night in 30 a **DIVINE** event drops a Divine Egg into every zone of the lane.
 
 It's built with **Three.js** and plain JavaScript ES modules, bundled by **Vite**. There are no image, model or audio files: every mesh, texture, particle and sound is generated in code at runtime.
 
@@ -46,8 +46,8 @@ The game will be served at `https://<user>.github.io/egg-dash/`. To redeploy on 
 | Action | Keys |
 | --- | --- |
 | Move | **W A S D** (or arrow up/down) |
-| Jump (hop over lasers!) | **Space** |
-| Steal / buy / hatch / open shop | **E** |
+| Jump | **Space** |
+| Steal / buy / sell / open shop | **E** (eggs are placed automatically when you step on an empty pad) |
 | Orbit camera | **Drag** with any mouse button · **Q** / **←** / **→** |
 | Zoom | **Mouse wheel** |
 | Close menu | **Esc** |
@@ -57,23 +57,25 @@ The game will be served at `https://<user>.github.io/egg-dash/`. To redeploy on 
 
 ## 🧭 How to play
 
-1. **Train.** Head west to the **Training Grounds**. Stand still on a treadmill you own and you'll start running in place, gaining **Speed ⚡** and a trickle of cash. Speed raises your walk speed (with diminishing returns).
-2. **Steal.** Head north to the **Heist Zone**. Each vault holds a ring of nests. Walk up to an egg and press **E**. Carrying an egg slows you down, and a HUGE egg slows you down more.
-3. **Escape.** Guards patrol with **vision cones** (yellow on the ground, red when they're chasing you). Laser sweepers spin at ankle height, so **jump** over them. Laser gates at vault entrances blink on and off. If you're caught you get sent back to base and the egg returns to its nest.
-4. **Deposit.** Bring the egg to the green **Deposit pad** in the plaza for cash. Eggs pay **1.5×** at night.
-5. **Upgrade.** Spend cash on better treadmills, trails (training multipliers) and pet eggs at the **Hatchery**. Pets multiply both training and heist cash.
+1. **Train.** Head west to the **Training Grounds**. Stand still on a treadmill you own and you'll run in place, gaining **Speed ⚡**. Treadmills give Speed only, never cash. Walk speed is **linear** in Speed: `walk = 12 + Speed / 500` studs/s, so 100K Speed gives twice the bonus of 50K (112 → 212 studs/s). The physics cap is 400 studs/s.
+2. **Steal.** Head north into the **Egg Lane**, one long walled runway. Eggs sit in two lines on pedestals, and every zone further from home has better eggs and faster guards. Press **E** next to an egg to grab it. That sets off the zone's alarm, and its guards chase you.
+3. **Outrun.** There are no lasers. It's a race: if you're faster than the guards (carrying an egg slows you a little), you can bring the egg all the way home. A guard whose egg you're holding never gives up until you reach the safe plaza. If you're caught, you go back to base and the egg returns to its pedestal.
+4. **Hatch.** Step onto an empty pad at **your base** (12 pads in the plaza) and the egg is placed there. It incubates, hatches into a pet, and the pet earns cash every second (a Doggy makes $5/s). When the base is full, press **E** on a pet's pad while carrying an egg to sell that pet and swap the egg in.
+5. **Upgrade.** Spend pet income on better treadmills and trails (training multipliers), then go deeper down the lane.
 
-### Vaults
+### The Egg Lane
 
-| Vault | Egg value | Guards | Hazards |
-| --- | --- | --- | --- |
-| Farm Coop | $30 | 1 (slow) | none |
-| Crystal Cavern | $220 | 2 | laser sweeper |
-| Golden Vault | $1.6K | 2 | sweeper + laser gate |
-| Lava Fortress | $13K | 3 | 2 sweepers + gate |
-| Neon Citadel | $110K | 4 (very fast) | 2 fast sweepers + gate |
+| Zone | Distance | Guards (speed) | Outrun at | Hatch | Pets (income/s) |
+| --- | --- | --- | --- | --- | --- |
+| Farm Coop | 36–86 m | 1 (9) | 👟12 (no training needed) | 8 s | Chick $2, Kitty $3, Doggy $5, Bunny $10 |
+| Crystal Cavern | 98–168 m | 2 (18) | 👟22 (⚡5K) | 15 s | Bunny $10, Piggy $15, Mousey $20, Fox $40 |
+| Golden Vault | 182–282 m | 2 (32) | 👟40 (⚡14K) | 25 s | Fox $40, Penguin $60, Panda $80, Owl $150 |
+| Lava Fortress | 298–448 m | 3 (55) | 👟68 (⚡28K) | 40 s | Owl $150, Polar Bear $220, Deer $300, Dragon $700 |
+| Neon Citadel | 466–706 m | 3 (95) | 👟115 (⚡52K) | 60 s | Deer $300, Dragon $700, Unicorn $1K, Phoenix $1.5K |
+| Cosmic Rift | 726–1086 m | 4 (160) | 👟195 (⚡92K) | 90 s | Dragon $700, Unicorn $1K, Phoenix $1.5K |
+| ✦ Divine Egg | 1 per zone, DIVINE nights only | that zone's guards | | 120 s | Divine pets, $5K–$15K |
 
-Faster vaults have faster guards, so you'll need Speed to outrun them. Sneaking around their vision cones always works.
+HUGE pets earn **5×** and take 1.5× longer to hatch. A pet sells for 30 seconds of its income.
 
 ---
 
@@ -82,17 +84,17 @@ Faster vaults have faster guards, so you'll need Speed to outrun them. Sneaking 
 | Brief | Implementation |
 | --- | --- |
 | **Night every 3 minutes** | 180 s cycle: 120 s of day and 60 s of night, with dusk and dawn blends. The HUD pill counts down to the next phase. |
-| **Divine event, 1/30 per night** | Rolled each time night falls (`CYCLE.divineChance = 1/30`). The sky turns to a gold and violet aurora, a light pillar and Divine Egg appear on the plaza altar, and a banner and toast announce it. The Divine Egg (and the Eggs menu entry) exists only during that night and gives a 30% chance of one of 4 **DIVINE** pets (x12 boost, halo, golden wings, particle aura). Otherwise you get a Legendary. |
-| **HUGE eggs, 1/10** | Each spawned egg independently rolls `HUGE_EGG_CHANCE = 1/10`. HUGE eggs are 2.1× size with a pulsing emissive shell, a glow halo, a spinning ground ring and sparkles. They pay **10×** cash plus a **free pet hatch**, and announce their spawn with a toast and a minimap marker. |
-| **Caught → reset** | Guards (patrol, spot, chase, give up) and lasers send you back to base, the egg goes back to its nest, and you get a BUSTED screen with a shake. |
+| **Divine event, 1/30 per night** | Rolled each time night falls (`CYCLE.divineChance = 1/30`). The sky turns to a gold and violet aurora, a light pillar rises from the plaza altar, and a **Divine Egg** appears in every zone of the Egg Lane with a golden beam. Steal one before dawn; it always hatches one of 4 **DIVINE** pets ($5K–$15K/s, halo, golden wings, particle aura). Unclaimed Divine eggs fade at sunrise. |
+| **HUGE eggs, 1/10 (Divine 1/50)** | Each spawned egg rolls `HUGE_EGG_CHANCE = 1/10`; Divine eggs roll `HUGE_DIVINE_CHANCE = 1/50`. HUGE eggs are 2.1× size with a pulsing shell, glow halo, spinning ring and light beam, and announce their spawn with a toast and a minimap marker. They hatch HUGE pets that earn **5×**. |
+| **Caught → reset** | Guards patrol and spot you with vision cones; stealing sets off the zone's alarm. If a guard catches you, you go back to base, the egg goes back to its pedestal, and you get a BUSTED screen with a shake. |
 | **20 treadmill tiers** | Each has a unique procedural model: Wooden Plank → Rustic Barn → Cobblestone → Bamboo → Iron → Steel → Copper → Gold → Ruby → Sapphire → Emerald → Amethyst → Crystal → Magma (embers) → Frostbite (ice spikes, snow) → Neon Bloom → Neon Pulse → Hologram (spinning holo rings) → Cyber Laser (laser rails, scanning sheet) → Quantum Cosmos (orbiting planets, starfield belt). Prices rise smoothly by about 1.86× per tier. |
-| **Passive training** | Standing still on an owned treadmill auto-runs. Speed/s = tier rate × trail × pets. |
+| **Passive training** | Standing still on an owned treadmill auto-runs. Speed/s = tier rate × trail. Speed only, no cash. |
 | **Functional trails** | 9 particle trails (Sparkle, Flame, Ocean, Toxic, Rainbow, Galaxy, Plasma, Void, Celestial), each a direct training multiplier from x1.25 up to x15. |
-| **Pets & eggs** | 15 regular pets across Common → Legendary plus 4 Divine pets. All are procedurally modeled, follow you, and hop or fly. There are 5 shop eggs with visible odds, a 3D hatch cinematic, up to 3 equipped, Equip Best, and Delete. |
+| **Pets & eggs** | Eggs are only stolen, never bought. 15 regular pets across Common → Legendary plus 4 Divine pets, all procedurally modeled. They live on your 12 base pads, hop or hover there, and earn cash per second. The Base menu shows every pad, the odds for each zone, and sell buttons. |
 | **Visuals** | Stylized low-poly world with PBR materials, soft PCF shadows that follow the player, **GTAO ambient occlusion**, **Unreal bloom**, SMAA, ACES tone mapping, a gradient sky with sun, moon, twinkling stars and aurora, fog transitions, and neon that switches on at night (lamps, signs, vault trims). |
-| **UI** | Arcade HUD: cycle timer, Cash, Speed (+rate), walk speed, multiplier, equipped pets and trail, rotating minimap, prompts, toasts, floating +cash/+speed numbers, an alarm vignette while chased, and sleek shop modals. |
+| **UI** | Arcade HUD: cycle timer, Cash, Speed (+rate), walk speed, pet income/s, top earners and trail, a lane progress bar, a rotating minimap that zooms out as you get faster, prompts, toasts, floating +cash/+speed numbers, an alarm vignette while chased, and shop modals. |
 
-Also included: a synthesized soundtrack and SFX (WebAudio, nothing to download), autosave to `localStorage`, a first-run tutorial, **Auto / Low / Medium / High (GTAO) / Ultra** graphics with automatic downgrade on slow machines, touch controls, and a stats page.
+Also included: a synthesized soundtrack and SFX (WebAudio, nothing to download), autosave to `localStorage` (older saves are migrated, and your best pets move onto base pads), a first-run tutorial, **Auto / Low / Medium / High (GTAO) / Ultra** graphics with automatic downgrade on slow machines, touch controls, and a stats page.
 
 ---
 
@@ -104,9 +106,9 @@ egg-dash/
 ├── vite.config.js
 ├── package.json
 └── src/
-    ├── main.js             # Game class: loop, camera, interactions, heists, hatching, events
-    ├── config.js           # ALL balance & content: cycle, treadmills, trails, pets, eggs, vaults
-    ├── state.js            # Save/load (localStorage), economy, multipliers, pet inventory
+    ├── main.js             # Game class: loop, camera, interactions, heists, placing/hatching, income
+    ├── config.js           # ALL balance & content: cycle, speed curve, treadmills, trails, pets, lane zones
+    ├── state.js            # Save/load (localStorage, migrates v1 saves), economy, base plots
     ├── util.js             # Materials, canvas text textures, egg geometry, helpers
     ├── styles.css          # Arcade UI styling (self-hosted Lilita One + Fredoka fonts)
     ├── engine/
@@ -121,22 +123,23 @@ egg-dash/
     │   ├── daynight.js     # 3-minute cycle, lighting/fog/bloom keyframes, divine roll
     │   ├── colliders.js    # 2.5D box/circle collision, step-up, line of sight
     │   ├── treadmills.js   # 20 unique treadmill models + training floor
-    │   ├── vaults.js       # Vault compounds, nests, eggs, guards (AI), lasers
-    │   └── hub.js          # Deposit pad, Divine altar, Hatchery, Trail shop
+    │   ├── lane.js         # The Egg Lane: zones, pedestals, eggs, guards (AI), Divine eggs
+    │   ├── base.js         # Your 12 base pads: incubating eggs, hatched pets, labels
+    │   └── hub.js          # Home arch, Divine altar, Trail shop
     ├── entities/
     │   ├── avatar.js       # Blocky animated character (player & guards)
     │   ├── player.js       # Player controller, carry arrow
-    │   ├── pets.js         # Procedural pet builder + followers
+    │   ├── pets.js         # Procedural pet builder
     │   └── trails.js       # Trail particle emitter
     └── ui/
         ├── hud.js          # HUD, toasts, floaters, banners, minimap
-        ├── menus.js        # Treadmill / Trail / Pet / Egg / Settings modals
-        └── preview.js      # Offscreen pet thumbnails + 3D hatch cinematic
+        ├── menus.js        # Treadmill / Trail / Base / Settings modals
+        └── preview.js      # Offscreen pet & egg thumbnails
 ```
 
 ### Tuning the game
 
-Every number lives in `src/config.js`: cycle length, divine odds, huge-egg odds, treadmill price curve, trail multipliers, pet rarities and powers, egg pools, vault values, guard speeds, and laser speeds.
+Every number lives in `src/config.js`: cycle length, divine odds, huge-egg odds, the Speed → walk curve, treadmill rates and prices, trail multipliers, pet incomes, and each lane zone's distance, guards, egg pool and hatch time.
 
 ### Debug mode
 
@@ -148,8 +151,9 @@ Open **http://localhost:5173/?debug** to unlock these keys:
 | **B** | Skip to dawn |
 | **V** | Force a **Divine** event at the next nightfall (and skip to dusk) |
 | **M** | +$1,000,000 |
-| **K** | +5,000 Speed |
-| **H** | Turn every egg in every nest HUGE |
+| **K** | +25,000 Speed |
+| **H** | Turn every egg in the lane HUGE |
+| **J** | Finish hatching every incubating egg |
 
 `window.game` is exposed in the console for poking around.
 

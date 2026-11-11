@@ -81,11 +81,15 @@ export class Player {
     }
     this.vel.y -= PLAYER.gravity * dt;
 
-    this.pos.x += this.vel.x * dt;
-    this.pos.z += this.vel.z * dt;
+    // sub-step horizontal motion so very fast runners never tunnel through walls
+    const travel = Math.hypot(this.vel.x, this.vel.z) * dt;
+    const steps = Math.min(80, Math.max(1, Math.ceil(travel / 0.45)));
     this.pos.y += this.vel.y * dt;
-
-    this.colliders.resolve(this.pos, PLAYER.radius);
+    for (let s = 0; s < steps; s++) {
+      this.pos.x += (this.vel.x * dt) / steps;
+      this.pos.z += (this.vel.z * dt) / steps;
+      this.colliders.resolve(this.pos, PLAYER.radius);
+    }
     const ground = this.colliders.groundAt(this.pos.x, this.pos.z, this.pos.y, PLAYER.radius);
     if (this.pos.y <= ground) {
       // snap up small steps; land
@@ -107,7 +111,8 @@ export class Player {
   updateArrow(t) {
     this.arrow.visible = !!this.carrying;
     if (!this.carrying) return;
-    const dx = WORLD.deposit.x - this.pos.x, dz = WORLD.deposit.z - this.pos.z;
+    const tgt = this.arrowTarget || WORLD.spawn;
+    const dx = tgt.x - this.pos.x, dz = tgt.z - this.pos.z;
     const yaw = Math.atan2(dx, dz);
     const extra = this.carrying.huge ? 2.2 : 1.1;
     this.arrow.position.set(this.pos.x + Math.sin(yaw) * 2.2, this.pos.y + 0.25 + Math.sin(t * 5) * 0.05, this.pos.z + Math.cos(yaw) * 2.2);

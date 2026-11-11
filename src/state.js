@@ -1,26 +1,37 @@
-import { TREADMILLS, TRAILS, PETS, RARITY, PLAYER } from './config.js';
+import { TREADMILLS, TRAILS, PETS, RARITY, PLOT_COUNT, ZONES, DIVINE_EGG, SELL_SECONDS, petIncome } from './config.js';
 
-const SAVE_KEY = 'eggdash-save-v1';
+const SAVE_KEY = 'eggdash-save-v2';
+const OLD_SAVE_KEY = 'eggdash-save-v1';
+const EGG_IDS = new Set([...ZONES.map((z) => z.id), DIVINE_EGG.id]);
 
 function defaults() {
   return {
-    version: 1,
+    version: 2,
     cash: 0,
     speed: 0,
     totalEarned: 0,
     eggsStolen: 0,
     hugeStolen: 0,
+    divineStolen: 0,
     timesCaught: 0,
     hatched: 0,
     treadmills: TREADMILLS.map((t) => t.cost === 0),
     trails: ['none'],
     trail: 'none',
-    pets: [],        // { uid, species }
-    equipped: [],    // uids
-    nextUid: 1,
+    // base plots: null | { egg, species, huge, hatchLeft, hatchTotal }
+    // hatchLeft > 0 means the egg is still incubating; 0 means a hatched pet earning cash
+    plots: Array(PLOT_COUNT).fill(null),
     settings: { quality: 'auto', music: 0.5, sfx: 0.8, showFps: false },
     tutorialDone: false,
   };
+}
+
+const num = (v, min = 0) => (typeof v === 'number' && isFinite(v) && v >= min ? v : min);
+
+function validPlot(p) {
+  if (!p || typeof p !== 'object' || !PETS[p.species] || !EGG_IDS.has(p.egg)) return null;
+  const hatchTotal = Math.max(1, num(p.hatchTotal, 1));
+  return { egg: p.egg, species: p.species, huge: p.huge === true, hatchTotal, hatchLeft: Math.min(hatchTotal, num(p.hatchLeft)) };
 }
 
 /** Central mutable game state with change listeners. */
@@ -34,27 +45,49 @@ class GameState {
   load() {
     try {
       const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      const d = defaults();
-      // shallow merge with validation so old/corrupt saves never break the game
-      for (const k of Object.keys(d)) {
-        if (parsed[k] !== undefined && typeof parsed[k] === typeof d[k]) d[k] = parsed[k];
+      if (raw) this.data = this.sanitize(JSON.parse(raw));
+      else {
+        const old = localStorage.getItem(OLD_SAVE_KEY);
+        if (old) { this.data = this.migrateV1(JSON.parse(old)); this.save(); }
       }
-      d.settings = { ...defaults().settings, ...(parsed.settings || {}) };
-      if (!Array.isArray(d.treadmills) || d.treadmills.length !== TREADMILLS.length) d.treadmills = defaults().treadmills;
-      d.treadmills[0] = true;
-      d.pets = (d.pets || []).filter((p) => p && PETS[p.species]);
-      d.equipped = (d.equipped || []).filter((uid) => d.pets.some((p) => p.uid === uid)).slice(0, PLAYER.maxEquippedPets);
-      d.trails = d.trails.filter((t) => TRAILS.some((x) => x.id === t));
-      if (!d.trails.includes('none')) d.trails.unshift('none');
-      if (!d.trails.includes(d.trail)) d.trail = 'none';
-      if (!isFinite(d.cash) || d.cash < 0) d.cash = 0;
-      if (!isFinite(d.speed) || d.speed < 0) d.speed = 0;
-      this.data = d;
     } catch (e) {
       console.warn('Save load failed, starting fresh', e);
+      this.data = defaults();
     }
+  }
+
+  /** Copy only known keys of the right type, so old/corrupt/tampered saves never break the game. */
+  sanitize(parsed) {
+    const d = defaults();
+    if (!parsed || typeof parsed !== 'object') return d;
+    for (const k of Object.keys(d)) {
+      if (parsed[k] !== undefined && typeof parsed[k] === typeof d[k] && Array.isArray(parsed[k]) === Array.isArray(d[k])) d[k] = parsed[k];
+    }
+    d.settings = { ...defaults().settings, ...(parsed.settings && typeof parsed.settings === 'object' ? parsed.settings : {}) };
+    if (d.treadmills.length !== TREADMILLS.length) d.treadmills = defaults().treadmills;
+    d.treadmills = d.treadmills.map((v) => v === true);
+    d.treadmills[0] = true;
+    d.trails = d.trails.filter((t) => TRAILS.some((x) => x.id === t));
+    if (!d.trails.includes('none')) d.trails.unshift('none');
+    if (!d.trails.includes(d.trail)) d.trail = 'none';
+    const plots = Array(PLOT_COUNT).fill(null);
+    for (let i = 0; i < PLOT_COUNT; i++) plots[i] = validPlot(d.plots[i]);
+    d.plots = plots;
+    for (const k of ['cash', 'speed', 'totalEarned', 'eggsStolen', 'hugeStolen', 'divineStolen', 'timesCaught', 'hatched']) d[k] = num(d[k]);
+    d.version = 2;
+    return d;
+  }
+
+  /** v1 saves (shop-bought pets that followed you) → v2: keep progress, move the best pets onto base plots. */
+  migrateV1(old) {
+    const d = this.sanitize({ ...old, plots: [] });
+    const pets = Array.isArray(old?.pets) ? old.pets.filter((p) => p && PETS[p.species]) : [];
+    pets.sort((a, b) => PETS[b.species].income - PETS[a.species].income);
+    pets.slice(0, PLOT_COUNT).forEach((p, i) => {
+      const egg = RARITY[PETS[p.species].rarity].order === 5 ? 'divine' : 'coop';
+      d.plots[i] = { egg, species: p.species, huge: false, hatchLeft: 0, hatchTotal: 1 };
+    });
+    return d;
   }
 
   save() {
@@ -81,54 +114,28 @@ class GameState {
   }
   addSpeed(n) { this.data.speed += n; this.emit('speed'); }
 
-  // ── multipliers ──
-  petMultiplier() {
-    let m = 1;
-    for (const uid of this.data.equipped) {
-      const p = this.data.pets.find((x) => x.uid === uid);
-      if (p) m += RARITY[PETS[p.species].rarity].power - 1;
-    }
-    return m;
-  }
+  // ── multipliers ── (only trails boost training now)
   trailMultiplier() { return (TRAILS.find((t) => t.id === this.data.trail) || TRAILS[0]).mult; }
-  trainingMultiplier() { return this.petMultiplier() * this.trailMultiplier(); }
+  trainingMultiplier() { return this.trailMultiplier(); }
 
-  // ── pets ──
-  addPet(species) {
-    const pet = { uid: this.data.nextUid++, species };
-    this.data.pets.push(pet);
-    this.data.hatched++;
-    // auto-equip if there is a free slot or it beats the weakest equipped pet
-    const power = (p) => RARITY[PETS[p.species].rarity].power;
-    if (this.data.equipped.length < PLAYER.maxEquippedPets) this.data.equipped.push(pet.uid);
-    else {
-      const eq = this.data.equipped.map((u) => this.data.pets.find((p) => p.uid === u));
-      eq.sort((a, b) => power(a) - power(b));
-      if (power(pet) > power(eq[0])) {
-        this.data.equipped = this.data.equipped.filter((u) => u !== eq[0].uid);
-        this.data.equipped.push(pet.uid);
-      }
-    }
-    this.emit('pets'); this.save();
-    return pet;
+  // ── base plots ──
+  plotIncome(p) { return p && p.hatchLeft <= 0 ? petIncome(p.species, p.huge) : 0; }
+  incomePerSec() { return this.data.plots.reduce((a, p) => a + this.plotIncome(p), 0); }
+  sellValue(p) { return Math.round(petIncome(p.species, p.huge) * SELL_SECONDS); }
+  freePlot() { return this.data.plots.findIndex((p) => !p); }
+
+  placeEgg(index, egg) {
+    this.data.plots[index] = egg;
+    this.emit('plots'); this.save();
   }
-  toggleEquip(uid) {
-    const eq = this.data.equipped;
-    if (eq.includes(uid)) this.data.equipped = eq.filter((u) => u !== uid);
-    else if (eq.length < PLAYER.maxEquippedPets) eq.push(uid);
-    else return false;
-    this.emit('pets'); this.save(); return true;
-  }
-  equipBest() {
-    const power = (p) => RARITY[PETS[p.species].rarity].power;
-    const sorted = [...this.data.pets].sort((a, b) => power(b) - power(a));
-    this.data.equipped = sorted.slice(0, PLAYER.maxEquippedPets).map((p) => p.uid);
-    this.emit('pets'); this.save();
-  }
-  deletePet(uid) {
-    this.data.pets = this.data.pets.filter((p) => p.uid !== uid);
-    this.data.equipped = this.data.equipped.filter((u) => u !== uid);
-    this.emit('pets'); this.save();
+  sellPlot(index) {
+    const p = this.data.plots[index];
+    if (!p) return 0;
+    const value = p.hatchLeft > 0 ? 0 : this.sellValue(p);
+    this.data.plots[index] = null;
+    if (value) this.addCash(value);
+    this.emit('plots'); this.save();
+    return value;
   }
 }
 

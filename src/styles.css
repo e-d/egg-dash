@@ -327,3 +327,16 @@ button { font-family: inherit; cursor: pointer; }
 @media (pointer: coarse) {
   .controls { display: none; }
 }
+
+/* ── Egg Lane progress bar ── */
+#lane-bar { position: absolute; top: 126px; left: 50%; transform: translateX(-50%); width: min(520px, 70vw); padding: 6px 10px 20px; border-radius: 14px; background: var(--panel); border: 2px solid var(--stroke); box-shadow: 0 4px 0 rgba(0,0,0,.3); }
+#lane-track { position: relative; height: 10px; border-radius: 6px; background: rgba(255,255,255,.12); overflow: hidden; }
+#lane-track .seg { position: absolute; top: 0; bottom: 0; opacity: .85; }
+#lane-dot { position: absolute; top: 2px; width: 16px; height: 16px; margin-left: 2px; border-radius: 50%; background: #fff; border: 3px solid #2f7dff; box-shadow: 0 0 10px #fff; transform: translateX(-50%); left: 0; }
+#lane-label { position: absolute; left: 0; right: 0; bottom: 2px; text-align: center; font-family: var(--display); font-size: 12px; letter-spacing: .5px; opacity: .9; white-space: nowrap; }
+#carry-banner { top: 178px; }
+@media (max-height: 520px) {
+  #lane-bar { top: 80px; padding: 4px 8px 16px; }
+  #lane-label { font-size: 10px; }
+  #carry-banner { top: 116px; }
+}

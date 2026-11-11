@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildPet } from '../entities/pets.js';
-import { PETS, RARITY, EGGS, DIVINE_EGG } from '../config.js';
+import { PETS, RARITY, ZONES, DIVINE_EGG } from '../config.js';
 import { eggGeometry, eggTexture } from '../util.js';
 import { audio } from '../engine/audio.js';
 
@@ -85,7 +85,7 @@ export class Preview {
   }
 
   makeEgg(egg) {
-    const i = Math.max(0, EGGS.indexOf(egg));
+    const i = Math.max(0, ZONES.indexOf(egg));
     const mat = new THREE.MeshStandardMaterial({ map: eggTexture(egg.color, egg.spot, egg.id === 'divine' || i % 2 ? 'stripes' : 'spots'), roughness: 0.3, metalness: egg.id === 'divine' ? 0.4 : 0.05, emissive: egg.color, emissiveIntensity: egg.id === 'divine' ? 0.5 : 0.12 });
     const m = new THREE.Mesh(eggGeometry(0.42, 1.08), mat);
     m.scale.setScalar(1.25);
@@ -94,7 +94,7 @@ export class Preview {
 
   prewarm() {
     for (const s of Object.keys(PETS)) this.thumb(s);
-    for (const e of [...EGGS, DIVINE_EGG]) this.eggThumb(e);
+    for (const e of [...ZONES, DIVINE_EGG]) this.eggThumb(e);
   }
 
   /** Queue a hatch cinematic. results: [{ species, egg }] */
@@ -159,7 +159,7 @@ export class Preview {
         const info = document.getElementById('hatch-info');
         info.innerHTML = `<div class="rar" style="color:${a.rar.color}">${a.rar.name.toUpperCase()}</div>
           <h2>${def.name}</h2>
-          <div class="boost">+${Math.round((a.rar.power - 1) * 100)}% speed & cash boost</div>
+          <div class="boost">earns $${def.income}/s</div>
           <div class="hint">${this.queue.length ? `${this.queue.length} more… ` : ''}click / press E to continue</div>`;
         this.spawnSparks(a.rar.color, order);
       }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { WORLD, VAULTS } from '../config.js';
+import { WORLD, LANE } from '../config.js';
 import { mulberry32, mat, mesh, neonMat, textTexture, signPlane } from '../util.js';
 import { makeGlowSprite } from '../fx/particles.js';
 
@@ -9,20 +9,13 @@ const rnd = mulberry32(1337);
 function blocked(x, z, pad = 0) {
   if (Math.hypot(x - WORLD.hub.x, z - WORLD.hub.z) < 34 + pad) return true;
   if (x < -38 + pad && x > -118 - pad && z > -38 - pad && z < 38 + pad) return true;              // training grounds
-  if (x > 34 - pad && x < 72 + pad && z > -22 - pad && z < 44 + pad) return true;                 // hatchery + trail shop
-  for (const v of VAULTS) if (Math.abs(x - v.x) < v.size / 2 + 10 + pad && Math.abs(z - v.z) < v.size / 2 + 14 + pad) return true;
+  if (x > 38 - pad && x < 62 + pad && z > 18 - pad && z < 42 + pad) return true;                  // trail shop
+  if (Math.abs(x) < LANE.halfW + 6 + pad && z < -20) return true;                                 // the Egg Lane
   // main paths
-  if (Math.abs(x) < 5 + pad && z < 0 && z > -125) return true;
   if (Math.abs(x) < 9 + pad && z > 0 && z < 74) return true;                                      // south path + home arch
   if (Math.abs(z) < 5 + pad && Math.abs(x) < 120) return true;
-  for (const v of VAULTS) if (distToSeg(x, z, 0, -20, v.x, v.z + v.size / 2 + 4) < 5 + pad) return true;
   if (Math.hypot(x - 64, z - 72) < 22 + pad) return true;                                        // pond
   return false;
-}
-function distToSeg(px, pz, ax, az, bx, bz) {
-  const dx = bx - ax, dz = bz - az;
-  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz)));
-  return Math.hypot(px - (ax + t * dx), pz - (az + t * dz));
 }
 
 export function buildWorld({ scene, colliders, daynight }) {
@@ -31,17 +24,20 @@ export function buildWorld({ scene, colliders, daynight }) {
   const H = WORLD.half;
 
   // ── terrain: flat play area that rises into low-poly hills beyond the boundary ──
-  const size = 900, seg = 120;
-  const tg = new THREE.PlaneGeometry(size, size, seg, seg);
+  // the terrain also runs north as a long valley around the Egg Lane
+  const zNorth = LANE.end - 330, zSouth = 450;
+  const sizeX = 900, sizeZ = zSouth - zNorth;
+  const tg = new THREE.PlaneGeometry(sizeX, sizeZ, 120, Math.round(sizeZ / 7.5));
   tg.rotateX(-Math.PI / 2);
+  tg.translate(0, 0, (zSouth + zNorth) / 2);
   const pos = tg.attributes.position;
   const colors = new Float32Array(pos.count * 3);
   const cA = new THREE.Color(0x6cc24a), cB = new THREE.Color(0x8fd65a), cC = new THREE.Color(0x4ea83a), cHill = new THREE.Color(0x5aa046), cRock = new THREE.Color(0x8a8f7a), tmp = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
-    const edge = Math.max(Math.abs(x), Math.abs(z)) - (H + 8);
+    const edge = edgeDist(x, z, H);
+    const n = noise(x, z);
     let y = 0;
-    const n = Math.sin(x * 0.05) * Math.cos(z * 0.045) + Math.sin(x * 0.11 + z * 0.07) * 0.5;
     if (edge > 0) y = Math.pow(edge, 1.25) * 0.35 * (1 + 0.4 * n) + n * 2;
     pos.setY(i, y);
     const v = 0.5 + 0.5 * Math.sin(x * 0.08 + Math.cos(z * 0.06) * 2) * Math.cos(z * 0.09);
@@ -56,7 +52,9 @@ export function buildWorld({ scene, colliders, daynight }) {
   group.add(terrain);
 
   // boundary walls (invisible)
-  colliders.box(0, -H - 2, H * 2 + 8, 4, 50, { noWalk: true, ghost: true });
+  const gapW = LANE.halfW + 1, segW = H + 4 - gapW;
+  colliders.box(-(gapW + segW / 2), -H - 2, segW, 4, 50, { noWalk: true, ghost: true });
+  colliders.box(gapW + segW / 2, -H - 2, segW, 4, 50, { noWalk: true, ghost: true });
   colliders.box(0, H + 2, H * 2 + 8, 4, 50, { noWalk: true, ghost: true });
   colliders.box(-H - 2, 0, 4, H * 2 + 8, 50, { noWalk: true, ghost: true });
   colliders.box(H + 2, 0, 4, H * 2 + 8, 50, { noWalk: true, ghost: true });
@@ -83,8 +81,6 @@ export function buildWorld({ scene, colliders, daynight }) {
   };
   addPath(-28, 0, -42, 0, 8);
   addPath(28, 0, 40, 0, 8);
-  addPath(0, -28, 0, -118, 7);
-  for (const v of VAULTS) addPath(0, -24, v.x, v.z + v.size / 2 + 2, 6);
   addPath(0, 28, 0, 70, 6);
 
   // ── trees (instanced, two foliage tones) ──
@@ -107,7 +103,16 @@ export function buildWorld({ scene, colliders, daynight }) {
     const o = H + 4 + rnd() * 18;
     const x = side < 2 ? t * (H + 10) : (side === 2 ? -o : o);
     const z = side < 2 ? (side === 0 ? -o : o) : t * (H + 10);
+    if (z < -H && Math.abs(x) < LANE.halfW + 14) continue;
     treeSpots.push({ x, z, s: 1 + rnd() * 0.9, pine: rnd() < 0.6, r: rnd(), outer: true });
+  }
+  // forest on the valley slopes along the lane
+  for (let z = -H - 6; z > LANE.end - 40; z -= 7) {
+    for (const s of [-1, 1]) {
+      if (rnd() < 0.25) continue;
+      const x = s * (LANE.halfW + 16 + rnd() * 70);
+      treeSpots.push({ x, z: z + rnd() * 5, s: 1 + rnd() * 0.9, pine: rnd() < 0.55, r: rnd(), outer: true });
+    }
   }
   const trunks = new THREE.InstancedMesh(trunkGeo, mat(0x8a5a33), treeSpots.length);
   const round = treeSpots.filter((t) => !t.pine), pine = treeSpots.filter((t) => t.pine);
@@ -197,8 +202,11 @@ export function buildWorld({ scene, colliders, daynight }) {
   const bulbMat = neonMat(0xffe7a3, 2.4);
   daynight.registerNeon(bulbMat);
   const lampSpots = [];
-  for (let z = -30; z >= -110; z -= 20) lampSpots.push([5.5, z], [-5.5, z]);
-  for (let a = 0; a < 8; a++) lampSpots.push([Math.cos(a / 8 * Math.PI * 2 + 0.39) * 31.5, Math.sin(a / 8 * Math.PI * 2 + 0.39) * 31.5]);
+  for (let a = 0; a < 8; a++) {
+    const ang = a / 8 * Math.PI * 2 + 0.39, x = Math.cos(ang) * 31.5, z = Math.sin(ang) * 31.5;
+    if (z < 0 && Math.abs(x) < LANE.halfW + 2) continue; // keep the lane mouth clear
+    lampSpots.push([x, z]);
+  }
   lampSpots.push([-40, 7], [-40, -7], [38, 7], [38, -7], [5, 38], [-5, 38]);
   const postGeo = new THREE.CylinderGeometry(0.16, 0.22, 5, 8);
   const bulbGeo = new THREE.SphereGeometry(0.42, 12, 8);
@@ -211,7 +219,7 @@ export function buildWorld({ scene, colliders, daynight }) {
   }
 
   // a handful of real point lights at key locations (cheap but atmospheric)
-  const lightSpots = [[0, 10, 18, 0x7dffb0], [-20, 9, -20, 0xffd59a], [20, 9, -20, 0xffd59a], [52, 9, -2, 0xff9ad8], [-70, 10, 0, 0x8ad8ff], [0, 9, -60, 0xffd59a]];
+  const lightSpots = [[0, 10, 17, 0x7dffb0], [-20, 9, -20, 0xffd59a], [20, 9, -20, 0xffd59a], [-70, 10, 0, 0x8ad8ff], [0, 9, -60, 0xffd59a]];
   for (const [x, y, z, c] of lightSpots) {
     const L = new THREE.PointLight(c, 90, 46, 1.6);
     L.position.set(x, y, z);
@@ -239,13 +247,12 @@ export function buildWorld({ scene, colliders, daynight }) {
     colliders.circle(x - Math.cos(ry) * 5, z + Math.sin(ry) * 5, 0.4, 8);
   };
   sign('TRAINING GROUNDS', '20 tiers • stand still to train', -40, 16, Math.PI / 2, '#2f6bff', '#9fd0ff');
-  sign('HEIST ZONE', 'steal eggs • avoid guards', 12, -32, 0, '#e8364f', '#ffd0d6');
 
   // ── clouds ──
   const clouds = new THREE.Group();
   const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 1, emissive: 0x223355, emissiveIntensity: 0.15 });
   const cloudGeo = new THREE.IcosahedronGeometry(1, 1);
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < 44; i++) {
     const c = new THREE.Group();
     const n = 4 + Math.floor(rnd() * 4);
     for (let j = 0; j < n; j++) {
@@ -253,7 +260,7 @@ export function buildWorld({ scene, colliders, daynight }) {
       const p = mesh(cloudGeo, cloudMat, { x: (j - n / 2) * 4.5 + rnd() * 2, y: rnd() * 2, z: rnd() * 4 - 2, s: [s * 1.2, s * 0.8, s], cast: false, receive: false });
       c.add(p);
     }
-    c.position.set((rnd() * 2 - 1) * 420, 70 + rnd() * 50, (rnd() * 2 - 1) * 420);
+    c.position.set((rnd() * 2 - 1) * 420, 70 + rnd() * 50, 420 - rnd() * (420 - LANE.end + 200));
     c.userData.speed = 1.5 + rnd() * 2.5;
     clouds.add(c);
   }
@@ -282,9 +289,19 @@ export function buildWorld({ scene, colliders, daynight }) {
   return { group, update, blocked };
 }
 
+function noise(x, z) {
+  return Math.sin(x * 0.05) * Math.cos(z * 0.045) + Math.sin(x * 0.11 + z * 0.07) * 0.5;
+}
+/** How far (x,z) is outside the flat play area: the main island plus the lane valley. */
+function edgeDist(x, z, H) {
+  const island = Math.max(Math.abs(x), Math.abs(z)) - (H + 8);
+  const vz0 = -H, vz1 = LANE.end - 20;
+  const valley = Math.max(Math.abs(x) - (LANE.halfW + 12), z - vz0, vz1 - z);
+  return Math.min(island, valley);
+}
 function terrainHeight(x, z, H) {
-  const edge = Math.max(Math.abs(x), Math.abs(z)) - (H + 8);
-  const n = Math.sin(x * 0.05) * Math.cos(z * 0.045) + Math.sin(x * 0.11 + z * 0.07) * 0.5;
+  const edge = edgeDist(x, z, H);
+  const n = noise(x, z);
   return edge > 0 ? Math.pow(edge, 1.25) * 0.35 * (1 + 0.4 * n) + n * 2 - 0.5 : 0;
 }
 

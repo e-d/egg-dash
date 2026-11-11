@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { PETS, RARITY } from '../config.js';
-import { state } from '../state.js';
 import { makeGlowSprite } from '../fx/particles.js';
-import { damp, angleDamp } from '../util.js';
 
 const S = (r, w = 20, h = 14) => new THREE.SphereGeometry(r, w, h);
 
@@ -188,75 +186,4 @@ export function buildPet(species) {
 
   g.userData = { species, def, body, head, tail, wings, halo, aura, flyer, divine };
   return g;
-}
-
-/** Equipped pets that trail the player. */
-export class PetFollowers {
-  constructor(scene) {
-    this.scene = scene;
-    this.followers = [];
-    this.key = '';
-  }
-
-  sync() {
-    const eq = state.data.equipped.map((uid) => state.data.pets.find((p) => p.uid === uid)).filter(Boolean);
-    const key = eq.map((p) => p.uid).join(',');
-    if (key === this.key) return;
-    this.key = key;
-    // keep existing followers when possible
-    const old = this.followers;
-    this.followers = eq.map((p) => {
-      const ex = old.find((f) => f.uid === p.uid);
-      if (ex) return ex;
-      const model = buildPet(p.species);
-      model.scale.setScalar(0.95);
-      this.scene.add(model);
-      return { uid: p.uid, model, pos: null, yaw: 0, phase: Math.random() * 10 };
-    });
-    for (const f of old) if (!this.followers.includes(f)) this.scene.remove(f.model);
-  }
-
-  update(dt, t, player, particles) {
-    const offs = [[-1.7, -1.6], [1.7, -1.6], [0, -2.9]];
-    const yaw = player.yaw;
-    const fx = Math.sin(yaw), fz = Math.cos(yaw);
-    const rx = Math.cos(yaw), rz = -Math.sin(yaw);
-    this.followers.forEach((f, i) => {
-      const [ox, oz] = offs[i % 3];
-      const tx = player.pos.x + rx * ox + fx * oz;
-      const tz = player.pos.z + rz * ox + fz * oz;
-      if (!f.pos) f.pos = new THREE.Vector3(tx, player.pos.y, tz);
-      const dx = tx - f.pos.x, dz = tz - f.pos.z;
-      const dist = Math.hypot(dx, dz);
-      if (dist > 30) f.pos.set(tx, player.pos.y, tz); // teleport catch-up
-      f.pos.x = damp(f.pos.x, tx, 6, dt);
-      f.pos.z = damp(f.pos.z, tz, 6, dt);
-      const moving = Math.min(1, dist / 1.2);
-      if (dist > 0.3) f.yaw = angleDamp(f.yaw, Math.atan2(dx, dz), 8, dt);
-      else f.yaw = angleDamp(f.yaw, yaw, 3, dt);
-      f.phase += dt * (6 + moving * 8);
-      const ud = f.model.userData;
-      let y = player.pos.y;
-      if (ud.flyer || ud.divine) y += 1.6 + Math.sin(f.phase * 0.5) * 0.25;
-      else y += Math.abs(Math.sin(f.phase)) * 0.45 * moving + Math.abs(Math.sin(f.phase * 0.3)) * 0.05;
-      f.model.position.set(f.pos.x, y, f.pos.z);
-      f.model.rotation.y = f.yaw;
-      ud.body.rotation.z = Math.sin(f.phase) * 0.08 * moving;
-      ud.tail.rotation.y = Math.sin(t * 8 + i) * 0.5;
-      for (const w of ud.wings) {
-        const flap = ud.flyer || ud.divine ? Math.sin(t * 12 + i) * 0.6 : Math.sin(t * 10) * 0.2 * moving;
-        w.g.rotation.z = w.s * flap;
-      }
-      if (ud.halo) ud.halo.rotation.z = t;
-      // auras
-      if (ud.divine && Math.random() < dt * 16) {
-        const a = Math.random() * Math.PI * 2;
-        particles.emit({ x: f.model.position.x + Math.cos(a) * 0.6, y: f.model.position.y + 0.3 + Math.random() * 1.2, z: f.model.position.z + Math.sin(a) * 0.6,
-          vx: Math.cos(a) * 0.3, vy: 1.4, vz: Math.sin(a) * 0.3, color: Math.random() < 0.5 ? 0xffd66b : 0xb48cff, color2: 0xffffff, size: 0.26, life: 1.2, intensity: 2.2, twinkle: true });
-      } else if (ud.def.rarity === 'legendary' && Math.random() < dt * 10) {
-        particles.emit({ x: f.model.position.x + (Math.random() - 0.5), y: f.model.position.y + 0.4 + Math.random(), z: f.model.position.z + (Math.random() - 0.5),
-          vy: 0.8, color: 0xffc94a, size: 0.2, life: 1, intensity: 2.5, twinkle: true });
-      }
-    });
-  }
 }

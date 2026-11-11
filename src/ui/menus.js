@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { TREADMILLS, TRAILS, PETS, RARITY, EGGS, DIVINE_EGG, formatNum, PLAYER, walkSpeedFor } from '../config.js';
+import { TREADMILLS, TRAILS, PETS, RARITY, ZONES, PLOT_COUNT, formatNum, walkSpeedFor, speedForWalk, eggDef, petIncome } from '../config.js';
 import { audio } from '../engine/audio.js';
 
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
@@ -7,8 +7,7 @@ const hex = (c) => '#' + c.toString(16).padStart(6, '0');
 const HEADS = {
   treadmills: { title: '🏃 Treadmills', c1: '#4f8bff', c2: '#2a56d6' },
   trails: { title: '✨ Trails', c1: '#c35cff', c2: '#7a2bd6' },
-  pets: { title: '🐾 Pets', c1: '#ff8a3d', c2: '#e0521a' },
-  eggs: { title: '🥚 Eggs', c1: '#ff4d8a', c2: '#d01f5c' },
+  pets: { title: '🏠 Your Base', c1: '#ff8a3d', c2: '#e0521a' },
   settings: { title: '⚙️ Settings', c1: '#5d6b86', c2: '#3a4560' },
 };
 
@@ -18,7 +17,7 @@ export class Menus {
     this.preview = preview;
     this.root = document.getElementById('modal-root');
     this.current = null;
-    this.deleteMode = false;
+    this.confirmSell = -1;
     this.confirmReset = false;
     document.querySelectorAll('.side-btn').forEach((b) => b.addEventListener('click', () => { audio.click(); this.toggle(b.dataset.menu); }));
     document.getElementById('equip-bar').addEventListener('click', (e) => {
@@ -54,7 +53,7 @@ export class Menus {
 
   open(name) {
     this.current = name;
-    this.deleteMode = false;
+    this.confirmSell = -1;
     this.confirmReset = false;
     this.render(true);
     this.game.input.enabled = false;
@@ -103,16 +102,9 @@ export class Menus {
       case 'go-tm': audio.click(); g.teleportToTreadmill(+arg); this.close(); return;
       case 'buy-trail': g.buyTrail(arg); break;
       case 'equip-trail': audio.click(); state.data.trail = arg; state.save(); state.emit('trail'); break;
-      case 'pet':
-        if (this.deleteMode) {
-          if (state.data.pets.length <= 1) { audio.error(); return; }
-          state.deletePet(+arg); audio.click();
-        } else if (!state.toggleEquip(+arg)) { audio.error(); g.hud.toast(`Max ${PLAYER.maxEquippedPets} pets equipped — unequip one first`, 'bad'); }
-        else audio.click();
-        break;
-      case 'equip-best': state.equipBest(); audio.purchase(); break;
-      case 'delete-mode': this.deleteMode = !this.deleteMode; audio.click(); this.render(false); break;
-      case 'hatch': g.hatch(arg, +t.dataset.n || 1); break;
+      case 'sell':
+        if (this.confirmSell !== +arg) { this.confirmSell = +arg; audio.click(); this.render(false); return; }
+        this.confirmSell = -1; g.sellPet(+arg); break;
       case 'quality': state.data.settings.quality = arg; state.save(); g.renderer.setQuality(arg); audio.click(); this.render(false); break;
       case 'fps': state.data.settings.showFps = !state.data.settings.showFps; state.save(); audio.click(); this.render(false); break;
       case 'reset':
@@ -146,12 +138,11 @@ export class Menus {
         <div class="swatch" style="background:${bg};${t.glow > 1 ? `box-shadow: inset 0 0 20px ${hex(t.accent)}` : ''}"><span class="tier">T${t.tier}</span></div>
         <h3>${t.name}</h3>
         <div class="meta">⚡ <b>+${formatNum(t.speedPerSec)}</b>/s <span style="opacity:.7">(→ ${formatNum(t.speedPerSec * mult)} with boosts)</span></div>
-        <div class="meta">💰 <b>+$${formatNum(t.cashPerSec)}</b>/s while training</div>
         <div class="row">${btns}</div>
       </div>`;
     }).join('');
     return `<div class="toolbar"><span class="chip">⚡ Speed ${formatNum(d.speed)}</span><span class="chip">👟 Walk ${walkSpeedFor(d.speed).toFixed(1)}</span><span class="chip">✖️ Training x${formatNum(mult)}</span>
-      <span class="spacer"></span><span class="chip">Stand still on a treadmill to train</span></div><div class="grid">${cards}</div>`;
+      <span class="spacer"></span><span class="chip">Stand still on a treadmill to train (Speed only)</span></div><div class="grid">${cards}</div>`;
   }
 
   trails() {
@@ -176,54 +167,45 @@ export class Menus {
 
   pets() {
     const d = state.data;
-    if (!d.pets.length) return `<div style="text-align:center;padding:30px;font-weight:700">No pets yet! Visit the <b>Hatchery</b> or open the 🥚 Eggs menu to hatch one.<br><br><button class="btn pink" data-act="hatch" data-arg="basic">Hatch Basic Egg — $${formatNum(EGGS[0].cost)}</button></div>`;
-    const power = (p) => RARITY[PETS[p.species].rarity].power;
-    const sorted = [...d.pets].sort((a, b) => (d.equipped.includes(b.uid) - d.equipped.includes(a.uid)) || power(b) - power(a) || b.uid - a.uid);
-    const cards = sorted.map((p) => {
+    const cards = d.plots.map((p, i) => {
+      if (!p) return `<div class="card pet-card" style="opacity:.75">
+        <div class="egg-art" style="font-size:42px;display:grid;place-items:center;height:96px">➕</div>
+        <div class="rar">Pad ${i + 1}</div><h3 style="font-size:15px">Empty</h3>
+        <div class="meta">Bring an egg here</div></div>`;
+      if (p.hatchLeft > 0) {
+        const e = eggDef(p.egg);
+        const pct = Math.round((1 - p.hatchLeft / p.hatchTotal) * 100);
+        return `<div class="card pet-card ${p.egg === 'divine' ? 'divine' : ''}">
+          <img src="${this.preview.eggThumb(e)}" alt="">
+          <div class="rar">Pad ${i + 1}</div><h3 style="font-size:15px">${p.huge ? 'HUGE ' : ''}${e.name}</h3>
+          <div class="meta">🥚 Hatching ${pct}% (${Math.ceil(p.hatchLeft)}s)</div></div>`;
+      }
       const def = PETS[p.species], r = RARITY[def.rarity];
-      const eq = d.equipped.includes(p.uid);
-      return `<div class="card pet-card ${eq ? 'equipped' : ''} ${def.rarity === 'divine' ? 'divine' : ''} ${this.deleteMode ? 'delete-mode' : ''}" data-act="pet" data-arg="${p.uid}" style="border-color:${eq ? '' : r.color + '66'}">
-        ${eq ? '<div class="eq-badge">EQUIPPED</div>' : ''}
+      const sure = this.confirmSell === i;
+      return `<div class="card pet-card ${def.rarity === 'divine' ? 'divine' : ''}" style="border-color:${r.color}66">
         <img src="${this.preview.thumb(p.species)}" alt="">
-        <div class="rar" style="color:${r.color}">${r.name}</div>
+        <div class="rar" style="color:${r.color}">${p.huge ? 'HUGE ' : ''}${r.name} • Pad ${i + 1}</div>
         <h3 style="font-size:15px">${def.name}</h3>
-        <div class="meta">x${r.power} boost</div>
+        <div class="meta" style="color:#7dffa6"><b>$${formatNum(petIncome(p.species, p.huge))}/s</b></div>
+        <div class="row"><button class="btn ${sure ? 'red' : 'gray'}" data-act="sell" data-arg="${i}">${sure ? 'Confirm' : 'Sell'} $${formatNum(state.sellValue(p))}</button></div>
       </div>`;
+    }).join('');
+    const odds = ZONES.map((z) => {
+      const total = Object.values(z.pool).reduce((a, b) => a + b, 0);
+      const list = Object.entries(z.pool).map(([s, w]) => `<span style="color:${RARITY[PETS[s].rarity].color}">${PETS[s].name} $${formatNum(PETS[s].income)}/s</span> ${Math.round((w / total) * 100)}%`).join(' • ');
+      const ok = walkSpeedFor(d.speed) >= z.needWalk;
+      return `<div class="setting" style="display:block;font-size:13px"><b style="color:#${z.color.toString(16).padStart(6, '0')}">${z.name}</b> ${ok ? '✅' : `🔒 outrun guards at 👟${z.needWalk} (⚡${formatNum(speedForWalk(z.needWalk))})`} • hatch ${z.hatch}s<br>${list}</div>`;
     }).join('');
     return `<div class="toolbar">
-        <span class="chip">Equipped ${d.equipped.length}/${PLAYER.maxEquippedPets}</span>
-        <span class="chip">Pet boost x${state.petMultiplier().toFixed(2)} (speed & cash)</span>
-        <span class="spacer"></span>
-        <button class="btn gold" data-act="equip-best">⭐ Equip Best</button>
-        <button class="btn ${this.deleteMode ? 'red' : 'gray'}" data-act="delete-mode">${this.deleteMode ? 'Done deleting' : '🗑 Delete'}</button>
+        <span class="chip">Pads ${d.plots.filter(Boolean).length}/${PLOT_COUNT}</span>
+        <span class="chip" style="color:#7dffa6">💸 Earning $${formatNum(state.incomePerSec())}/s</span>
+        <span class="spacer"></span><span class="chip">HUGE pets earn 5×</span>
       </div>
-      ${this.deleteMode ? '<div class="chip" style="margin-bottom:10px;background:rgba(255,80,100,.25)">Click a pet to delete it permanently</div>' : ''}
-      <div class="grid pets-grid">${cards}</div>`;
-  }
-
-  eggs() {
-    const d = state.data;
-    const list = [...EGGS];
-    const divine = this.game.daynight.divine;
-    const cards = (divine ? [DIVINE_EGG, ...list] : list).map((e) => {
-      const isDiv = e.id === 'divine';
-      const total = Object.values(e.pool).reduce((a, b) => a + b, 0);
-      let odds;
-      if (isDiv) {
-        odds = `<span style="color:${RARITY.divine.color}">✦ Any DIVINE pet</span><span>${Math.round(e.divineOdds * 100)}%</span><span style="color:${RARITY.legendary.color}">Legendary pet</span><span>${Math.round((1 - e.divineOdds) * 100)}%</span>`;
-      } else odds = Object.entries(e.pool).map(([s, w]) => `<span style="color:${RARITY[PETS[s].rarity].color}">${PETS[s].name}</span><span>${(w / total * 100).toFixed(w / total < 0.1 ? 1 : 0)}%</span>`).join('');
-      const afford = d.cash >= e.cost, afford3 = d.cash >= e.cost * 3;
-      return `<div class="card egg-card ${isDiv ? 'equipped' : ''}" style="${isDiv ? 'background:linear-gradient(160deg, rgba(255,230,140,.25), rgba(170,120,255,.25))' : ''}">
-        <div class="egg-art"><img src="${this.preview.eggThumb(e)}" alt=""></div>
-        <h3 style="text-align:center">${e.name}${isDiv ? ' <span style="font-size:12px">(tonight only!)</span>' : ''}</h3>
-        <div class="odds">${odds}</div>
-        <div class="row">
-          <button class="btn ${afford ? 'pink' : 'gray'}" data-act="hatch" data-arg="${e.id}" data-n="1" ${afford ? '' : 'disabled'}>Hatch $${formatNum(e.cost)}</button>
-          <button class="btn ${afford3 ? 'pink' : 'gray'}" data-act="hatch" data-arg="${e.id}" data-n="3" ${afford3 ? '' : 'disabled'}>x3</button>
-        </div>
+      <div class="grid pets-grid">${cards}</div>
+      <h3 style="margin:16px 0 8px">🥚 What hatches from each zone</h3>
+      <div class="settings-list">${odds}
+        <div class="setting" style="display:block;font-size:13px"><b style="color:${RARITY.divine.color}">✦ Divine Egg</b> (DIVINE nights only, 1 per zone, 1 in 50 HUGE) • always a <span style="color:${RARITY.divine.color}">DIVINE</span> pet, $5K–$15K/s</div>
       </div>`;
-    }).join('');
-    return `<div class="toolbar"><span class="chip">${divine ? '🌟 A DIVINE EGG is available tonight — also hatch it at the altar!' : '🌙 Divine Eggs can only appear during a rare DIVINE night (1/30 nights)'}</span></div><div class="grid">${cards}</div>`;
   }
 
   settings() {
@@ -239,8 +221,9 @@ export class Menus {
         <span>Eggs stolen</span><span>${formatNum(d.eggsStolen)}</span>
         <span>HUGE eggs stolen</span><span>${formatNum(d.hugeStolen)}</span>
         <span>Times busted</span><span>${formatNum(d.timesCaught)}</span>
+        <span>Divine eggs stolen</span><span>${formatNum(d.divineStolen)}</span>
         <span>Pets hatched</span><span>${formatNum(d.hatched)}</span>
-        <span>Divine pets owned</span><span>${d.pets.filter((p) => PETS[p.species].rarity === 'divine').length}</span>
+        <span>Pet income</span><span>$${formatNum(state.incomePerSec())}/s</span>
       </div>
       <div class="setting">Progress is saved automatically in this browser.
         <button class="btn red" style="flex:0 0 auto" data-act="reset">${this.confirmReset ? 'Click again to confirm' : 'Reset progress'}</button></div>
