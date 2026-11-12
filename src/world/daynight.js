@@ -79,7 +79,7 @@ export class DayNight {
     if (nowNight !== this.isNight) {
       this.isNight = nowNight;
       if (nowNight) {
-        const roll = Math.random() < CYCLE.divineChance || this.forceDivineNext;
+        const roll = false; // Divines are a permanent part of every land now, not a night event
         this.forceDivineNext = false;
         this.divine = roll;
         this.events.emit('night', { divine: roll });

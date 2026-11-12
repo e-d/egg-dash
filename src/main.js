@@ -19,7 +19,7 @@ import { Menus } from './ui/menus.js';
 import { Preview } from './ui/preview.js';
 import { state } from './state.js';
 import { Events, damp } from './util.js';
-import { TREADMILLS, TRAILS, DIVINE_EGG, PETS, RARITY, WORLD, HUGE_HATCH_MULT, walkSpeedFor, petIncome, formatNum } from './config.js';
+import { TREADMILLS, TRAILS, PETS, RARITY, WORLD, HUGE_HATCH_MULT, SHOP_ITEMS, DCOIN_REWARD, SLOW_MODE_SPEED, walkSpeedFor, petIncome, formatNum, eggDef, eggName } from './config.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -80,6 +80,7 @@ class Game {
     this.saveTimer = 0;
     this.tutorialStep = 0;
     this.tutorialTimer = 3;
+    this.slowMode = false;
 
     this.renderer.onResize.push((qualityChanged) => {
       if (qualityChanged) this.daynight.setShadowSize(this.renderer.shadowSize);
@@ -95,31 +96,23 @@ class Game {
 
   bindEvents() {
     const E = this.events;
-    E.on('night', ({ divine }) => {
+    E.on('night', () => {
       audio.isNight = true;
-      if (divine) {
-        audio.divine = true;
-        this.hub.setDivine(true);
-        this.lane.setDivine(true, this.particles);
-        audio.divineEvent();
-        this.hud.banner('✦ DIVINE EVENT ✦<small>A Divine Egg appeared in every zone of the Egg Lane! Steal one before dawn!</small>', 'divine', 6000);
-        this.hud.toast('🌟 <b>DIVINE EVENT!</b> Follow the golden beams down the Egg Lane. 1 in 50 Divine eggs is HUGE!', 'gold', 6);
-      } else {
-        audio.night();
-        this.hud.banner('NIGHT FALLS<small>Guards see less in the dark</small>', 'night');
-      }
+      audio.night();
+      this.hud.banner('NIGHT FALLS<small>The Guardians sleep extra soundly…</small>', 'night');
     });
-    E.on('day', ({ endedDivine }) => {
-      audio.isNight = false; audio.divine = false;
-      this.hub.setDivine(false);
-      this.lane.setDivine(false);
+    E.on('day', () => {
+      audio.isNight = false;
       audio.day();
-      this.hud.banner('SUNRISE<small>' + (endedDivine ? 'The unclaimed Divine eggs fade away…' : 'A new day of heists begins') + '</small>', 'day', 3000);
+      this.hud.banner('SUNRISE<small>A new day of heists begins</small>', 'day', 3000);
+    });
+    E.on('divineSpawn', (egg) => {
+      if (this.started && Math.abs(egg.z - this.player.pos.z) < 220) this.hud.toast(`✦ The <b>${egg.zone.def.name} Divine Egg</b> is back on its golden pedestal!`, 'gold', 4);
     });
     E.on('caught', (info) => this.onCaught(info));
     E.on('spotted', () => { if (!this.player.caught) audio.alert(); });
     E.on('hugeSpawn', (egg) => {
-      if (this.started) this.hud.toast(`🌟 A <b>HUGE${egg.divine ? ' DIVINE' : ''}</b> egg spawned in the <b>${egg.zone.def.name}</b>!`, 'gold', 4);
+      if (this.started) this.hud.toast(`🌟 A <b>HUGE</b> egg spawned in <b>${egg.zone.def.name}</b>!`, 'gold', 4);
     });
   }
 
@@ -127,6 +120,7 @@ class Game {
     const j = document.getElementById('touch-jump'), a = document.getElementById('touch-act');
     j.addEventListener('touchstart', (e) => { e.preventDefault(); this.input.touchJump = true; });
     a.addEventListener('touchstart', (e) => { e.preventDefault(); this.input.pressed.add('e'); });
+    document.getElementById('slow-btn').addEventListener('click', () => this.toggleSlowMode());
   }
 
   start() {
@@ -171,9 +165,8 @@ class Game {
     this.returnEgg(egg);
   }
 
-  /** Put an egg back on its pedestal (a Divine egg that outlived its night turns ordinary). */
+  /** Put an egg back on its pedestal. */
   returnEgg(egg) {
-    if (egg.divine && !this.daynight.divine) this.lane.roll(egg);
     this.lane.placeInNest(egg);
     egg.pop = 0;
   }
@@ -181,13 +174,120 @@ class Game {
   buyTrail(id) {
     const t = TRAILS.find((x) => x.id === id);
     if (state.data.trails.includes(id)) return;
-    if (!state.spend(t.cost)) { audio.error(); return; }
+    if (t.dcoins ? !state.spendDcoins(t.dcoins) : !state.spend(t.cost)) { audio.error(); this.hud.toast(t.dcoins ? `Need 🪙 ${formatNum(t.dcoins - state.data.dcoins)} more D Coins` : 'Not enough cash', 'bad'); return; }
     state.data.trails.push(id);
     state.data.trail = id;
     state.save(); state.emit('trail');
     audio.purchase();
     this.hud.toast(`✨ Equipped <b>${t.name}</b> — training x${t.mult}!`, 'good');
     this.particles.burst(this.player.pos.x, 1.5, this.player.pos.z, 90, { colors: t.colors, speed: 8, life: 1.2 });
+  }
+
+  // ── D Coin shop ──
+  buyShopItem(id) {
+    const item = SHOP_ITEMS.find((x) => x.id === id);
+    if (!item) return;
+    const d = state.data;
+    const fail = (msg) => { audio.error(); this.hud.toast(msg, 'bad', 3); };
+    if (d.dcoins < item.price) return fail(`Need 🪙 ${formatNum(item.price - d.dcoins)} more D Coins. You earn 10 every 3 minutes, or try a code!`);
+    // check the purchase can actually be used before charging
+    let pad = -1;
+    if (item.kind === 'egg') { pad = state.freePlot(); if (pad < 0) return fail('Your base is full! Sell a pet to free a pad first.'); }
+    if (item.kind === 'perk' && state.perk(item.perk)) return fail('You already own this upgrade.');
+    if (item.kind === 'trail' && d.trails.includes(item.trail)) return fail('You already own this trail.');
+    if (item.kind === 'hatch' && !d.plots.some((p) => p && p.hatchLeft > 0)) return fail('No eggs are incubating right now.');
+    if (!state.spendDcoins(item.price)) return fail('Not enough D Coins');
+
+    const P = this.player.pos;
+    let msg = '';
+    switch (item.kind) {
+      case 'egg': {
+        const def = eggDef(item.egg);
+        const species = pickWeighted(def.pool);
+        state.placeEgg(pad, { egg: def.id, species, huge: false, hatchLeft: def.hatch, hatchTotal: def.hatch });
+        this.base.sync();
+        const bp = this.base.pads[pad];
+        this.particles.burst(bp.x, 1.5, bp.z, 140, { colors: [0xfff2b0, item.color, 0xffffff], speed: 10, life: 1.4, size: 0.5, gravity: -6, twinkle: true });
+        msg = `✦ <b>${def.name} Divine Egg</b> placed on pad ${pad + 1}! Hatches in ${def.hatch}s.`;
+        break;
+      }
+      case 'boost':
+        state.addBoost(item.boost, item.secs);
+        if (item.boost === 'luck') this.lane.rerollAll();
+        msg = `${item.icon} <b>${item.name}</b> active! (${Math.round(state.boostLeft(item.boost) / 60)} min left)`;
+        break;
+      case 'perk':
+        state.addPerk(item.perk);
+        msg = `${item.icon} <b>${item.name}</b> unlocked forever!`;
+        break;
+      case 'hatch':
+        for (const p of d.plots) if (p && p.hatchLeft > 0) p.hatchLeft = Math.min(p.hatchLeft, 0.3);
+        msg = `${item.icon} <b>Hatch-o-Matic!</b> Your eggs are hatching!`;
+        break;
+      case 'speed':
+        state.addSpeed(item.amount);
+        this.hud.floater(`+${formatNum(item.amount)} ⚡`, new THREE.Vector3(P.x, P.y + 3, P.z), 'speed big', 2);
+        msg = `${item.icon} <b>+${formatNum(item.amount)} Speed!</b>`;
+        break;
+      case 'cash': {
+        const v = Math.max(item.min, Math.round(state.incomePerSec() * item.secs));
+        state.addCash(v);
+        this.hud.floater(`+$${formatNum(v)}`, new THREE.Vector3(P.x, P.y + 3, P.z), 'cash big', 2);
+        msg = `${item.icon} <b>+$${formatNum(v)}</b> cash!`;
+        break;
+      }
+      case 'trail': {
+        const t = TRAILS.find((x) => x.id === item.trail);
+        d.trails.push(t.id); d.trail = t.id;
+        state.emit('trail');
+        msg = `🌈 Equipped <b>${t.name}</b>, training ×${t.mult}!`;
+        break;
+      }
+    }
+    state.save();
+    audio.purchase();
+    this.particles.burst(P.x, P.y + 1.5, P.z, 60, { colors: [0xffd23f, 0xfff3a8, 0xffffff], speed: 7, life: 1, twinkle: true });
+    this.hud.toast(msg, 'gold', 4);
+  }
+
+  redeemCode(text) {
+    const r = state.redeemCode(text);
+    if (!r.ok) { audio.error(); this.hud.toast(r.msg, 'bad', 3.5); return r; }
+    audio.divineEvent();
+    const P = this.player.pos;
+    this.particles.burst(P.x, P.y + 1.5, P.z, 160, { colors: [0xffd23f, 0xfff3a8, 0x7dffa6, 0xffffff], speed: 11, life: 1.6, size: 0.5, gravity: -6, twinkle: true });
+    this.hud.toast(`🎉 ${r.msg} <b>+🪙 ${r.amount.toLocaleString('en-US')} D Coins</b>`, 'gold', 5);
+    return r;
+  }
+
+  /** SLOW MODE: walk at exactly 10 studs/s; switching it off restores your normal speed. */
+  toggleSlowMode() {
+    this.slowMode = !this.slowMode;
+    audio.click();
+    document.body.classList.toggle('slow-mode', this.slowMode);
+    this.hud.toast(this.slowMode ? `🐢 <b>SLOW MODE ON</b>: you walk at exactly ${SLOW_MODE_SPEED} studs/s` : `🐇 <b>SLOW MODE OFF</b>: back to ${walkSpeedFor(state.data.speed).toFixed(1)} studs/s`, this.slowMode ? '' : 'good', 2.5);
+  }
+
+  currentWalk() { return this.slowMode ? SLOW_MODE_SPEED : walkSpeedFor(state.data.speed); }
+
+  /** Time rewards (10 D Coins every 3 minutes played) and boost timers. */
+  updateRewards(dt) {
+    if (!this.started) return;
+    const d = state.data;
+    d.dcoinTimer += dt;
+    if (d.dcoinTimer >= DCOIN_REWARD.every) {
+      d.dcoinTimer -= DCOIN_REWARD.every;
+      state.addDcoins(DCOIN_REWARD.amount);
+      audio.purchase();
+      const P = this.player.pos;
+      this.hud.floater(`+${DCOIN_REWARD.amount} 🪙`, new THREE.Vector3(P.x, P.y + 3, P.z), 'dcoin big', 2);
+      this.hud.toast(`⏰ Time reward! <b>+${DCOIN_REWARD.amount} D Coins</b> for playing 3 minutes. Spend them in the 🛒 SHOP!`, 'gold', 4);
+    }
+    const ended = state.tickBoosts(dt);
+    if (ended) {
+      const names = ended.map((b) => SHOP_ITEMS.find((i) => i.boost === b)).filter(Boolean).map((i) => `${i.icon} ${i.name}`);
+      if (names.length) this.hud.toast(`${names.join(', ')} wore off.`, '', 3);
+    }
   }
 
   onReset() {
@@ -208,12 +308,13 @@ class Game {
     this.player.training = null;
     this.sellConfirm = null;
     audio.pickup(egg.huge || egg.divine);
-    const color = egg.divine ? 0xffe08a : egg.zone.def.color;
-    this.particles.burst(egg.x, 1.2, egg.z, egg.huge ? 60 : 24, { colors: [color, 0xffffff], speed: 5, life: 0.8 });
-    this.lane.alarm(egg.zone);
-    if (egg.divine) this.hud.toast(`✦ You grabbed a <b>${egg.huge ? 'HUGE ' : ''}DIVINE EGG</b>! Get it home!`, 'gold', 4);
-    else if (egg.huge) this.hud.toast('🌟 You grabbed a <b>HUGE EGG</b>! It\'s heavy, so get it home!', 'gold');
-    else this.hud.toast(`🚨 The ${egg.zone.def.name} guards are after you! Run home!`, 'bad', 2.5);
+    const color = egg.divine ? egg.zone.def.trim : egg.zone.def.color;
+    this.particles.burst(egg.x, 1.2, egg.z, egg.huge || egg.divine ? 60 : 24, { colors: [color, 0xffffff], speed: 5, life: 0.8 });
+    this.lane.wake(egg);
+    const sleepy = state.boost('sleep') ? ' (Sleepy Dust: it\'s groggy!)' : '';
+    if (egg.divine) this.hud.toast(`✦ You grabbed the <b>${egg.zone.def.name} DIVINE EGG</b>! Its Guardian is waking up${sleepy}. RUN!`, 'gold', 4);
+    else if (egg.huge) this.hud.toast(`🌟 You grabbed a <b>HUGE EGG</b>! The Guardian woke up${sleepy}. Get it home!`, 'gold');
+    else this.hud.toast(`🚨 The ${egg.zone.def.name} Guardian woke up${sleepy}! Run home!`, 'bad', 2.5);
   }
 
   /** Drop the carried egg on a base pad: it starts incubating there. */
@@ -221,18 +322,18 @@ class Game {
     const egg = this.player.carrying;
     if (!egg) return;
     this.player.carrying = null;
-    const src = egg.divine ? DIVINE_EGG : egg.zone.def;
+    const src = egg.def;
     const species = pickWeighted(src.pool);
     const total = Math.round(src.hatch * (egg.huge ? HUGE_HATCH_MULT : 1));
     state.data.eggsStolen++;
     if (egg.huge) state.data.hugeStolen++;
     if (egg.divine) state.data.divineStolen++;
-    state.placeEgg(index, { egg: egg.divine ? 'divine' : egg.zone.def.id, species, huge: egg.huge, hatchLeft: total, hatchTotal: total });
+    state.placeEgg(index, { egg: src.id, species, huge: egg.huge, hatchLeft: total, hatchTotal: total });
     this.lane.consume(egg);
     this.base.sync();
     audio.deposit(egg.huge || egg.divine);
     const pad = this.base.pads[index];
-    this.particles.burst(pad.x, 1.5, pad.z, egg.huge ? 120 : 50, { colors: [0x7dffa6, 0xffe14a, 0xffffff, egg.divine ? 0xffe08a : egg.zone.def.color], speed: egg.huge ? 11 : 7, life: 1.2, size: 0.45, gravity: -10 });
+    this.particles.burst(pad.x, 1.5, pad.z, egg.huge ? 120 : 50, { colors: [0x7dffa6, 0xffe14a, 0xffffff, egg.divine ? egg.zone.def.trim : egg.zone.def.color], speed: egg.huge ? 11 : 7, life: 1.2, size: 0.45, gravity: -10 });
     this.hud.toast(`🥚 Egg placed on pad ${index + 1}! It hatches in <b>${total}s</b>.`, egg.huge || egg.divine ? 'gold' : 'good', 3);
     if (this.tutorialStep === 3) this.advanceTutorial();
   }
@@ -265,7 +366,7 @@ class Game {
       audio.divineEvent();
       this.hud.toast(`✦ Pad ${index + 1} hatched a <b style="color:${rar.color}">DIVINE ${name}</b>! <b>$${formatNum(inc)}/s</b>`, 'gold', 6);
       const pad = this.base.pads[index];
-      this.particles.burst(pad.x, 2, pad.z, 200, { colors: [0xfff2b0, 0xd9b8ff, 0xffffff], speed: 12, life: 2, size: 0.6, gravity: -3, twinkle: true });
+      this.particles.burst(pad.x, 2, pad.z, 200, { colors: [0xfff2b0, def.aura ?? 0xd9b8ff, 0xffffff], speed: 12, life: 2, size: 0.6, gravity: -3, twinkle: true });
     } else {
       audio.levelUp();
       this.hud.toast(`🐣 Pad ${index + 1} hatched a <b style="color:${rar.color}">${rar.name} ${name}</b>! <b>$${formatNum(inc)}/s</b>`, rar.order >= 4 || p.huge ? 'gold' : 'good', 4);
@@ -302,9 +403,9 @@ class Game {
     if (this.tutorialTimer > 0) return;
     const steps = {
       1: ['👋 Welcome to <b>EGG DASH</b>! Head <b>west</b> to the <b>Training Grounds</b> and stand still on the wooden treadmill to train Speed.', 9],
-      2: ['⚡ Every bit of Speed makes you faster. Now head <b>north</b> into the <b>Egg Lane</b> and press <b>E</b> on a Farm egg to steal it!', 9],
-      3: ['🚨 The guards are chasing you! Run back to <b>your base</b> in the plaza and step onto an empty pad.', 9],
-      4: ['🐣 Your egg will hatch into a pet that earns cash every second. Buy faster treadmills and trails, then go deeper down the lane for better eggs!', 10],
+      2: ['⚡ Every bit of Speed makes you faster. Now head <b>north</b> into the <b>Egg Lane</b>. The Guardians are asleep… press <b>E</b> on a Forest egg to steal it!', 9],
+      3: ['🚨 You woke up its Guardian! Run back to <b>your base</b> in the plaza and step onto an empty pad.', 9],
+      4: ['🐣 Your egg will hatch into a pet that earns cash every second. Every land has a golden <b>✦ DIVINE egg</b> at its far end. Earn 🪙 D Coins to spend in the <b>🛒 SHOP</b>!', 11],
     };
     const s = steps[this.tutorialStep];
     if (!s) { state.data.tutorialDone = true; state.save(); return; }
@@ -342,9 +443,9 @@ class Game {
     // eggs in the lane
     const egg = this.lane.nearestEgg(P.x, P.z);
     if (egg) {
-      const label = egg.divine ? '<span style="color:#ffe9a0">✦ DIVINE</span> ' : '';
+      const label = egg.divine ? `<span style="color:#ffe9a0">✦ ${egg.zone.def.name} DIVINE</span> ` : '';
       const huge = egg.huge ? '<span style="color:#ffe14a">HUGE</span> ' : '';
-      this.prompt = { text: `${kbd('E')} Steal ${huge}${label}${egg.divine ? '' : egg.zone.def.name + ' '}Egg`, cls: egg.huge || egg.divine ? 'good' : '' };
+      this.prompt = { text: `${kbd('E')} Steal ${huge}${label}${egg.divine ? '' : egg.zone.def.name + ' '}Egg • wakes its Guardian!`, cls: egg.huge || egg.divine ? 'good' : '' };
       if (E) this.steal(egg);
       return;
     }
@@ -352,9 +453,9 @@ class Game {
     // base pads: inspect / sell (press twice to confirm)
     if (padIdx >= 0) {
       if (this.sellConfirm && (this.sellConfirm.i !== padIdx || this.time > this.sellConfirm.until)) this.sellConfirm = null;
-      if (!plot) { this.prompt = { text: `Pad ${padIdx + 1} is empty. Steal an egg from the Egg Lane and bring it here`, cls: '' }; return; }
+      if (!plot) { this.prompt = { text: `Pad ${padIdx + 1} is empty. Steal an egg from the Egg Lane (or buy a Divine Egg in the 🛒 SHOP)`, cls: '' }; return; }
       const def = PETS[plot.species];
-      if (plot.hatchLeft > 0) { this.prompt = { text: `🥚 Hatching in ${Math.ceil(plot.hatchLeft)}s…`, cls: '' }; return; }
+      if (plot.hatchLeft > 0) { this.prompt = { text: `🥚 ${eggName(plot.egg)} hatching in ${Math.ceil(plot.hatchLeft)}s…`, cls: '' }; return; }
       const name = `${plot.huge ? 'HUGE ' : ''}${def.name}`;
       const val = formatNum(state.sellValue(plot));
       if (this.sellConfirm) {
@@ -500,10 +601,12 @@ class Game {
     const i = this.input;
     if (i.hit('n')) this.daynight.skipToDusk();
     if (i.hit('b')) this.daynight.skipToDawn();
-    if (i.hit('v')) { this.daynight.forceDivineNext = true; this.daynight.skipToDusk(); }
+    if (i.hit('v')) this.lane.respawnDivines();
+    if (i.hit('c')) state.addDcoins(1000);
+    if (i.hit('t')) state.data.dcoinTimer = DCOIN_REWARD.every - 2;
     if (i.hit('m')) state.addCash(1e6);
     if (i.hit('k')) state.addSpeed(25000);
-    if (i.hit('h')) for (const e of this.lane.eggs) if (e.state === 'nest') this.lane.roll(e, { forceHuge: true, divine: e.divine });
+    if (i.hit('h')) for (const e of this.lane.eggs) if (e.state === 'nest' && !e.divine) this.lane.roll(e, { forceHuge: true });
     if (i.hit('j')) for (const p of state.data.plots) if (p && p.hatchLeft > 0) p.hatchLeft = Math.min(p.hatchLeft, 0.5);
   }
 
@@ -534,14 +637,14 @@ class Game {
     // player
     let steering = false;
     if (pl.carrying) { const f = this.base.nearestFree(pl.pos.x, pl.pos.z); pl.arrowTarget = f ? { x: f.x, z: f.z } : { x: WORLD.hub.x, z: WORLD.hub.z + 17 }; }
-    if (this.started && !pl.caught) steering = pl.update(dt, this.input, this.camYaw, walkSpeedFor(state.data.speed), t);
+    if (this.started && !pl.caught) steering = pl.update(dt, this.input, this.camYaw, this.currentWalk(), t, !this.slowMode && !state.perk('carry'));
     else pl.avatar.animate(dt, { speed: 0 });
     pl.safe = Math.hypot(pl.pos.x - WORLD.hub.x, pl.pos.z - WORLD.hub.z) < WORLD.hub.safeRadius;
     if (pl.carrying) {
       const egg = pl.carrying;
       egg.group.position.set(pl.pos.x, pl.pos.y + 2.25 + Math.sin(t * 8) * 0.03, pl.pos.z);
       egg.group.rotation.y = pl.yaw;
-      if ((egg.huge || egg.divine) && Math.random() < dt * 25) this.particles.emit({ x: pl.pos.x + (Math.random() - 0.5) * 1.5, y: pl.pos.y + 2.4 + Math.random() * 1.5, z: pl.pos.z + (Math.random() - 0.5) * 1.5, vy: 1, color: Math.random() < 0.5 ? 0xffffff : egg.divine ? 0xffe08a : egg.zone.def.color, size: 0.3, life: 1, intensity: 3, twinkle: true });
+      if ((egg.huge || egg.divine) && Math.random() < dt * 25) this.particles.emit({ x: pl.pos.x + (Math.random() - 0.5) * 1.5, y: pl.pos.y + 2.4 + Math.random() * 1.5, z: pl.pos.z + (Math.random() - 0.5) * 1.5, vy: 1, color: Math.random() < 0.5 ? 0xffffff : egg.divine ? egg.zone.def.trim : egg.zone.def.color, size: 0.3, life: 1, intensity: 3, twinkle: true });
     }
     if (pl.jumped) { pl.jumped = false; audio.jump(); }
     // footstep dust when sprinting & a puff on landing
@@ -557,10 +660,11 @@ class Game {
 
     // world systems
     this.daynight.update(dt, pl.pos, t);
-    this.lane.update(dt, t, { pos: pl.pos, carrying: pl.carrying, caught: pl.caught || !this.started, safe: pl.safe }, this.particles, this.daynight.nightFactor);
-    this.chasedBy = this.lane.guards.filter((g) => g.state === 'chase').length;
+    this.lane.update(dt, t, { pos: pl.pos, carrying: pl.carrying, caught: pl.caught || !this.started, safe: pl.safe }, this.particles);
+    this.chasedBy = this.lane.guards.filter((g) => g.state === 'chase' || g.state === 'waking').length;
     this.base.update(dt, t, this.particles, pl.pos, !!pl.carrying);
     this.updateIncome(dt);
+    this.updateRewards(dt);
     for (const tm of this.treadmills.list) tm.near = Math.abs(tm.x - pl.pos.x) < 45 && Math.abs(tm.z - pl.pos.z) < 45;
     this.treadmills.update(dt, t, pl.training?.tier, this.particles);
     this.hub.update(dt, t, this.particles, this.daynight.nightFactor);
@@ -603,7 +707,7 @@ async function boot() {
   game.preview.prewarm();
   game.hud.renderEquip();
   game.loop();
-  loading.textContent = DEBUG ? 'Debug mode: N night • B dawn • V divine • M +$1M • K +25K speed • H huge eggs • J finish hatching' : 'Ready!';
+  loading.textContent = DEBUG ? 'Debug: N night • B dawn • V respawn Divines • M +$1M • K +25K speed • C +1K D Coins • T time reward • H huge eggs • J finish hatching' : 'Ready!';
   play.disabled = false;
   const go = () => { if (!game.started) game.start(); };
   play.addEventListener('click', go);

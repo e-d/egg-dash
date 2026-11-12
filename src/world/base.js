@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { WORLD, PETS, RARITY, eggDef, petIncome, formatNum } from '../config.js';
+import { WORLD, PETS, RARITY, eggDef, eggName, petIncome, formatNum } from '../config.js';
 import { state } from '../state.js';
-import { mat, mesh, neonMat, textTexture, signPlane, eggGeometry, eggTexture, roundRect } from '../util.js';
-import { buildPet } from '../entities/pets.js';
+import { mat, mesh, neonMat, textTexture, signPlane, eggGeometry, eggMaterial, roundRect } from '../util.js';
+import { buildPet, animatePet } from '../entities/pets.js';
 import { makeGlowSprite } from '../fx/particles.js';
 
 const PAD_H = 0.35;
@@ -65,11 +65,7 @@ export class Base {
   }
 
   eggMat(id) {
-    if (!this.eggMats.has(id)) {
-      const d = eggDef(id);
-      this.eggMats.set(id, new THREE.MeshStandardMaterial({ map: eggTexture(d.color, d.spot, id === 'divine' ? 'stripes' : 'spots'), roughness: 0.3,
-        metalness: id === 'divine' || id === 'gold' ? 0.45 : 0.05, emissive: id === 'divine' ? 0xffe08a : d.color, emissiveIntensity: 0.2 }));
-    }
+    if (!this.eggMats.has(id)) this.eggMats.set(id, eggMaterial(eggDef(id)));
     return this.eggMats.get(id);
   }
 
@@ -112,7 +108,7 @@ export class Base {
     else if (p.hatchLeft > 0) {
       const d = eggDef(p.egg);
       const secs = Math.ceil(p.hatchLeft);
-      lines = [[`${p.huge ? 'HUGE ' : ''}${d.name.replace(/ (Coop|Cavern|Vault|Fortress|Citadel|Rift)$/, '')} Egg`, p.egg === 'divine' ? '#ffe9a0' : '#ffffff'], [`Hatching… ${secs}s`, '#ffd23f']];
+      lines = [[`${p.huge ? 'HUGE ' : ''}${eggName(p.egg)}`, d.divine ? '#ffe9a0' : '#ffffff'], [`Hatching… ${secs}s`, '#ffd23f']];
     } else {
       const def = PETS[p.species], r = RARITY[def.rarity];
       lines = [[`${p.huge ? 'HUGE ' : ''}${def.name}`, r.color], [`$${formatNum(petIncome(p.species, p.huge))}/s`, '#7dffa6']];
@@ -174,6 +170,7 @@ export class Base {
       if (ud.tail) ud.tail.rotation.y = Math.sin(t * 8 + i) * 0.5;
       if (ud.wings) for (const w of ud.wings) w.g.rotation.z = w.s * (fly ? Math.sin(t * 12 + i) * 0.6 : Math.sin(t * 4 + i) * 0.15);
       if (ud.halo) ud.halo.rotation.z = t;
+      if (near) animatePet(pad.model, t, dt);
       if (ud.divine && near && Math.random() < dt * 14) {
         const a = Math.random() * Math.PI * 2;
         particles.emit({ x: pad.x + Math.cos(a) * 0.8, y: 1.2 + Math.random() * 1.6, z: pad.z + Math.sin(a) * 0.8, vx: Math.cos(a) * 0.3, vy: 1.4, vz: Math.sin(a) * 0.3,

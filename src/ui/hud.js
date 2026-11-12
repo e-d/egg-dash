@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { state } from '../state.js';
-import { formatNum, PETS, RARITY, TRAILS, ZONES, LANE, WORLD, CYCLE, PLOT_COUNT, walkSpeedFor } from '../config.js';
+import { formatNum, PETS, RARITY, TRAILS, ZONES, LANE, WORLD, CYCLE, PLOT_COUNT, DCOIN_REWARD, SHOP_ITEMS, walkSpeedFor } from '../config.js';
 
 const $ = (id) => document.getElementById(id);
 const _v = new THREE.Vector3();
@@ -14,7 +14,9 @@ export class HUD {
       equip: $('equip-bar'), prompt: $('prompt'), carry: $('carry-banner'), toasts: $('toasts'), floaters: $('floaters'),
       banner: $('event-banner'), busted: $('busted'), vignette: $('vignette'), fps: $('fps'), minimap: $('minimap'), hint: $('help-hint'),
       laneBar: $('lane-bar'), laneTrack: $('lane-track'), laneDot: $('lane-dot'), laneLabel: $('lane-label'),
+      dcoins: $('stat-dcoins'), dtimer: $('stat-dtimer'), boosts: $('boosts'), slowBtn: $('slow-btn'),
     };
+    this.walkStat = this.el.walk.parentElement;
     this.mm = this.el.minimap.getContext('2d');
     this.floaters = [];
     this.last = {};
@@ -26,7 +28,7 @@ export class HUD {
     const span = LANE.start - LANE.end;
     this.el.laneTrack.innerHTML = ZONES.map((z) => {
       const left = ((LANE.start - z.z0) / span) * 100, w = ((z.z0 - z.z1) / span) * 100;
-      return `<div class="seg" style="left:${left}%;width:${w}%;background:#${z.color.toString(16).padStart(6, '0')}" title="${z.name}"></div>`;
+      return `<div class="seg" style="left:${left}%;width:${w}%;background:#${z.trim.toString(16).padStart(6, '0')}" title="${z.name}"></div>`;
     }).join('');
     setTimeout(() => { this.el.hint.style.opacity = '0'; }, 25000);
   }
@@ -71,9 +73,16 @@ export class HUD {
     this.setText('cash', '$' + formatNum(d.cash), 'cash');
     this.setText('speed', formatNum(d.speed));
     this.setText('speedRate', game.player.training ? `+${formatNum(game.trainRate)}/s` : '');
-    const walk = walkSpeedFor(d.speed);
-    this.setText('walk', walk < 100 ? walk.toFixed(1) : Math.round(walk).toString());
+    const walk = game.currentWalk();
+    this.setText('walk', game.slowMode ? `${walk} 🐢` : walk < 100 ? walk.toFixed(1) : Math.round(walk).toString());
+    this.walkStat.classList.toggle('slow', game.slowMode);
+    this.el.slowBtn.classList.toggle('on', game.slowMode);
+    this.setText('slowState', game.slowMode ? 'ON' : 'OFF');
     this.setText('income', '$' + formatNum(state.incomePerSec()) + '/s');
+    this.setText('dcoins', formatNum(d.dcoins), 'dcoins');
+    const left = Math.max(0, Math.ceil(DCOIN_REWARD.every - d.dcoinTimer));
+    this.setText('dtimer', `+${DCOIN_REWARD.amount} in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`);
+    this.renderBoosts(d);
 
     // prompt
     const pr = game.prompt;
@@ -90,7 +99,7 @@ export class HUD {
     let ck = '';
     if (c) {
       const full = state.freePlot() < 0;
-      const what = c.divine ? `✦ ${c.huge ? 'HUGE ' : ''}DIVINE Egg` : `${c.huge ? '🌟 HUGE ' : '🥚 '}${c.zone.def.name} Egg`;
+      const what = c.divine ? `✦ ${c.zone.def.name} DIVINE Egg` : `${c.huge ? '🌟 HUGE ' : '🥚 '}${c.zone.def.name} Egg`;
       ck = `${what} • ${full ? 'Base full! Swap it with a pet on any pad' : 'Run it home to an empty pad!'}${chased ? ' 🚨' : ''}`;
     }
     if (ck !== this.last.carry) {
@@ -109,7 +118,7 @@ export class HUD {
       this.el.laneDot.style.left = `calc(10px + ${k.toFixed(4)} * (100% - 20px))`;
       const zn = game.lane.zoneAt(P.z, 0);
       const dist = Math.round(LANE.start - P.z);
-      this.setText('laneLabel', zn ? `${zn.def.name} • ${dist}m from base • guards run ${zn.def.guardSpeed}` : `${dist}m from base`);
+      this.setText('laneLabel', zn ? `${zn.def.emoji} Land ${zn.index + 1}: ${zn.def.name} • ${dist}m from base • Guardians run ${zn.def.guardSpeed}` : `${dist}m from base`);
     }
 
     // floaters
@@ -126,9 +135,20 @@ export class HUD {
     this.drawMinimap(game);
   }
 
+  renderBoosts(d) {
+    const parts = Object.entries(d.boosts).map(([b, secs]) => {
+      const it = SHOP_ITEMS.find((i) => i.boost === b);
+      const s = Math.ceil(secs);
+      return it ? `<div class="boost-chip"><span class="bi">${it.icon}</span>${it.name}<small>${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}</small></div>` : '';
+    });
+    const html = parts.join('');
+    if (html !== this.last.boosts) { this.last.boosts = html; this.el.boosts.innerHTML = html; }
+  }
+
   setText(k, v, bumpClass) {
     if (this.last[k] === v) return;
     this.last[k] = v;
+    if (k === 'slowState') { this.el.slowBtn.querySelector('.slow-state').textContent = v; return; }
     this.el[k].textContent = v;
     if (bumpClass) {
       const s = this.el[k].parentElement;
@@ -185,7 +205,7 @@ export class HUD {
 
   busted(reason, hadEgg) {
     const b = this.el.busted;
-    b.querySelector('small').textContent = `A guard caught you! ${hadEgg ? 'The egg went back to its pedestal. Train more Speed to outrun them!' : 'Back to base you go.'}`;
+    b.querySelector('small').textContent = `A Guardian caught you! ${hadEgg ? 'The egg went back to its pedestal. Train more Speed to outrun them!' : 'Back to base you go.'}`;
     b.classList.add('hidden'); void b.offsetWidth; b.classList.remove('hidden');
     clearTimeout(this.bustT);
     this.bustT = setTimeout(() => b.classList.add('hidden'), 1400);
@@ -196,7 +216,7 @@ export class HUD {
     const W = 200, R = 100;
     const P = game.player.pos;
     // zoom out as you get faster so the map always shows what's coming
-    const scale = Math.max(0.12, 0.9 * Math.min(1, 24 / walkSpeedFor(state.data.speed))); // px per world unit
+    const scale = Math.max(0.12, 0.9 * Math.min(1, 24 / game.currentWalk())); // px per world unit
     g.save();
     g.clearRect(0, 0, W, W);
     g.beginPath(); g.arc(R, R, R, 0, Math.PI * 2); g.clip();
@@ -226,12 +246,13 @@ export class HUD {
     // special eggs
     for (const e of game.lane.eggs) {
       if (e.state !== 'nest' || !(e.huge || e.divine)) continue;
-      g.fillStyle = e.divine ? '#fff3a8' : '#ffe14a';
+      g.fillStyle = e.divine ? hex(e.zone.def.trim) : '#ffe14a';
       g.beginPath(); g.arc(e.x * scale, e.z * scale, e.divine ? 4.5 : 3.5, 0, Math.PI * 2); g.fill();
     }
     for (const gd of game.lane.guards) {
-      g.fillStyle = gd.state === 'chase' ? '#ff2a3a' : '#ff9aa4';
-      g.beginPath(); g.arc(gd.pos.x * scale, gd.pos.z * scale, 3, 0, Math.PI * 2); g.fill();
+      const awake = gd.state === 'chase' || gd.state === 'waking';
+      g.fillStyle = awake ? '#ff2a3a' : gd.state === 'sleep' ? 'rgba(200,190,255,.55)' : '#ff9aa4';
+      g.beginPath(); g.arc(gd.pos.x * scale, gd.pos.z * scale, awake ? 4 : 2.5, 0, Math.PI * 2); g.fill();
     }
     g.restore();
     // player arrow (center)

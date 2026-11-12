@@ -29,13 +29,18 @@
         <div class="stat speed"><span class="ico">⚡</span><span id="stat-speed">0</span><small id="stat-speed-rate"></small></div>
         <div class="stat walk"><span class="ico">👟</span><span id="stat-walk">10</span><small>studs/s</small></div>
         <div class="stat mult"><span class="ico">🐾</span><span id="stat-income">$0/s</span><small>pets</small></div>
+        <div class="stat dcoin" data-open="shop" title="D Coins: +10 every 3 minutes you play"><span class="ico">🪙</span><span id="stat-dcoins">0</span><small id="stat-dtimer">+10 in 3:00</small></div>
       </div>
+      <div id="boosts"></div>
 
       <!-- menu buttons -->
       <div id="side-buttons">
         <button class="side-btn" data-menu="treadmills" style="--c1:#4f8bff;--c2:#2a56d6"><span>🏃</span><b>Treadmills</b></button>
         <button class="side-btn" data-menu="trails" style="--c1:#c35cff;--c2:#7a2bd6"><span>✨</span><b>Trails</b></button>
         <button class="side-btn" data-menu="pets" style="--c1:#ff8a3d;--c2:#e0521a"><span>🏠</span><b>Base</b></button>
+        <button class="side-btn shop-btn" data-menu="shop" style="--c1:#ffd23f;--c2:#e08a00"><span>🛒</span><b>SHOP</b></button>
+        <button class="side-btn" data-menu="codes" style="--c1:#3ddc84;--c2:#159a52"><span>🎟️</span><b>Codes</b></button>
+        <button class="side-btn slow-btn" id="slow-btn" style="--c1:#7a8aa8;--c2:#4a5878" title="Toggle SLOW MODE (walk at exactly 10 studs/s)"><span>🐢</span><b>SLOW MODE</b><i class="slow-state">OFF</i></button>
         <button class="side-btn" data-menu="settings" style="--c1:#5d6b86;--c2:#3a4560"><span>⚙️</span><b>Settings</b></button>
       </div>
 
@@ -80,8 +85,8 @@
           <div><kbd>Drag</kbd> Camera &nbsp; <kbd>Scroll</kbd> Zoom</div>
         </div>
         <div class="tips">
-          🥚 Run down the <b>Egg Lane</b>, grab an egg and outrun the guards back to <b>your base</b>. It hatches into a pet that earns cash.<br />
-          🌟 1 in 10 eggs is <b>HUGE</b> (5× income). &nbsp; 🌙 Night every 3 min, with a 1/30 chance of a <b>DIVINE</b> event!
+          🥚 Sneak down the <b>Egg Lane</b> through <b>10 lands</b>. Guardians sleep until you grab their egg, then outrun them back to <b>your base</b>!<br />
+          ✦ Every land has a golden <b>DIVINE egg</b> ($25K–$5M/s pets). 🪙 Earn <b>D Coins</b> for the <b>SHOP</b>, and try a code!
         </div>
         <div id="loading">Building world…</div>
       </div>

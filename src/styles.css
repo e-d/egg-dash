@@ -340,3 +340,67 @@ button { font-family: inherit; cursor: pointer; }
   #lane-label { font-size: 10px; }
   #carry-banner { top: 116px; }
 }
+
+/* ── D Coins, boosts, SHOP / Codes / SLOW MODE buttons ── */
+.stat.dcoin { pointer-events: auto; cursor: pointer; border-color: rgba(255, 210, 63, .55); }
+.stat.dcoin span:nth-child(2) { color: var(--gold); }
+.stat.dcoin small { color: #ffe9a0; }
+#side-buttons { display: grid; grid-template-columns: repeat(2, auto); gap: 8px; transform: translateY(-34%); }
+.side-btn { width: 66px; height: 66px; position: relative; }
+.side-btn span { font-size: 25px; }
+.side-btn b { font-size: 10px; white-space: nowrap; }
+.shop-btn { animation: shopGlow 2.2s ease-in-out infinite; }
+.shop-btn b { color: #3a2400; text-shadow: 0 1px 0 rgba(255,255,255,.5); font-size: 12px; }
+@keyframes shopGlow { 50% { box-shadow: 0 5px 0 rgba(0,0,0,.35), 0 0 22px rgba(255, 210, 63, .9); } }
+.slow-btn b { font-size: 8.5px; }
+.slow-btn .slow-state { position: absolute; top: -7px; right: -7px; font-style: normal; font-family: var(--display); font-size: 10px; padding: 1px 5px; border-radius: 8px; background: #444c66; border: 2px solid #fff; }
+.slow-btn.on { --c1: #3ddc84 !important; --c2: #0f8a48 !important; box-shadow: 0 5px 0 rgba(0,0,0,.35), 0 0 20px rgba(61, 220, 132, .9); }
+.slow-btn.on .slow-state { background: #0f8a48; }
+.stat.walk.slow span:nth-child(2) { color: #7dffa6; }
+
+#boosts { position: absolute; left: 14px; bottom: 14px; display: flex; flex-direction: column-reverse; gap: 6px; align-items: flex-start; }
+.boost-chip { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 6px; border-radius: 12px; background: linear-gradient(90deg, rgba(110,70,0,.88), rgba(40,20,70,.88)); border: 2px solid rgba(255,210,63,.7); font-family: var(--display); font-size: 14px; box-shadow: 0 3px 0 rgba(0,0,0,.3); }
+.boost-chip .bi { font-size: 18px; }
+.boost-chip small { font-family: var(--body); font-weight: 700; color: #ffe9a0; font-size: 12px; }
+.floater.dcoin { color: var(--gold); }
+
+/* shop + codes */
+.dcoin-chip { color: var(--gold); }
+.shop-section { margin: 4px 0 18px; }
+.shop-section h3 { margin: 0 0 2px; font-family: var(--display); font-weight: 400; font-size: 22px; letter-spacing: .5px; }
+.shop-section .blurb { font-size: 13px; color: var(--muted); font-weight: 700; margin-bottom: 10px; }
+.shop-card { text-align: center; align-items: center; }
+.shop-card .art { height: 84px; width: 100%; border-radius: 12px; display: grid; place-items: center; font-size: 46px; position: relative; overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--ac, #ffd23f) 55%, transparent), rgba(255,255,255,.04) 70%); border: 2px solid rgba(255,255,255,.12); }
+.shop-card .art img { height: 80px; width: 80px; object-fit: contain; filter: drop-shadow(0 0 8px var(--ac, #ffd23f)); }
+.shop-card .art .owned-tag, .shop-card .art .time-tag { position: absolute; top: 5px; right: 6px; font-family: var(--display); font-size: 12px; padding: 1px 7px; border-radius: 8px; background: rgba(0,0,0,.55); }
+.shop-card .desc { font-size: 12.5px; font-weight: 700; color: var(--muted); min-height: 32px; }
+.shop-card.egg { border-color: color-mix(in srgb, var(--ac) 55%, transparent); }
+.shop-card.egg:hover { box-shadow: 0 0 22px color-mix(in srgb, var(--ac) 45%, transparent); }
+.btn.dcoin { background: linear-gradient(180deg, #ffd23f, #e08a00); color: #3a2400; }
+.codes-box { display: flex; flex-direction: column; gap: 14px; max-width: 520px; margin: 0 auto; }
+.codes-box .hero { text-align: center; font-weight: 700; color: var(--muted); }
+.codes-box .hero b { color: #fff; }
+.code-row { display: flex; gap: 10px; }
+.code-row input { flex: 1; min-width: 0; font-family: var(--display); font-size: 22px; letter-spacing: 1px; text-transform: uppercase; padding: 10px 14px; border-radius: 14px; border: 3px solid rgba(255,255,255,.3); background: rgba(0,0,0,.35); color: #fff; outline: none; }
+.code-row input:focus { border-color: var(--gold); box-shadow: 0 0 14px rgba(255,210,63,.5); }
+.code-row .btn { flex: 0 0 auto; font-size: 18px; padding: 0 22px; }
+.code-msg { text-align: center; font-weight: 700; min-height: 22px; }
+.code-msg.ok { color: #7dffa6; } .code-msg.bad { color: #ff7a8a; }
+.code-list { display: flex; flex-direction: column; gap: 8px; }
+.code-list .used { display: flex; justify-content: space-between; padding: 8px 12px; border-radius: 12px; background: rgba(61,255,122,.1); border: 2px solid rgba(61,255,122,.35); font-weight: 700; }
+.land-odds { display: block !important; font-size: 13px; }
+
+@media (max-width: 720px) {
+  .side-btn { width: 54px; height: 54px; }
+  .side-btn b { font-size: 8px; } .slow-btn b { font-size: 7px; }
+}
+@media (max-height: 520px) {
+  #side-buttons { top: 108px; transform: none; gap: 5px; }
+  .side-btn { width: 44px; height: 44px; }
+  .slow-btn .slow-state { font-size: 8px; top: -5px; right: -5px; }
+  .stat.dcoin small { display: none; }
+  #boosts { left: 8px; bottom: 8px; }
+  .boost-chip { font-size: 11px; padding: 2px 7px 2px 4px; } .boost-chip .bi { font-size: 13px; }
+  .code-row input { font-size: 17px; padding: 6px 10px; }
+}

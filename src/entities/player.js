@@ -42,7 +42,7 @@ export class Player {
   /**
    * Returns true if the player is actively steering this frame.
    */
-  update(dt, input, camYaw, walkSpeed, t) {
+  update(dt, input, camYaw, walkSpeed, t, carryPenalty = true) {
     const mv = input.moveVector();
     const steering = Math.hypot(mv.x, mv.y) > 0.05;
     const jump = input.hit(' ') || input.touchJump;
@@ -64,7 +64,7 @@ export class Player {
     }
 
     let speed = walkSpeed;
-    if (this.carrying) speed *= this.carrying.huge ? PLAYER.hugeCarryPenalty : PLAYER.carryPenalty;
+    if (this.carrying && carryPenalty) speed *= this.carrying.huge ? PLAYER.hugeCarryPenalty : PLAYER.carryPenalty;
 
     const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw);
     const rx = Math.cos(camYaw), rz = -Math.sin(camYaw);

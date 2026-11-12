@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { buildPet } from '../entities/pets.js';
-import { PETS, RARITY, ZONES, DIVINE_EGG } from '../config.js';
-import { eggGeometry, eggTexture } from '../util.js';
+import { buildPet, animatePet } from '../entities/pets.js';
+import { PETS, RARITY, ZONES, DIVINE_EGGS } from '../config.js';
+import { eggGeometry, eggMaterial } from '../util.js';
 import { audio } from '../engine/audio.js';
 
 function raysTexture() {
@@ -85,16 +85,14 @@ export class Preview {
   }
 
   makeEgg(egg) {
-    const i = Math.max(0, ZONES.indexOf(egg));
-    const mat = new THREE.MeshStandardMaterial({ map: eggTexture(egg.color, egg.spot, egg.id === 'divine' || i % 2 ? 'stripes' : 'spots'), roughness: 0.3, metalness: egg.id === 'divine' ? 0.4 : 0.05, emissive: egg.color, emissiveIntensity: egg.id === 'divine' ? 0.5 : 0.12 });
-    const m = new THREE.Mesh(eggGeometry(0.42, 1.08), mat);
+    const m = new THREE.Mesh(eggGeometry(0.42, 1.08), eggMaterial(egg));
     m.scale.setScalar(1.25);
     return m;
   }
 
   prewarm() {
     for (const s of Object.keys(PETS)) this.thumb(s);
-    for (const e of [...ZONES, DIVINE_EGG]) this.eggThumb(e);
+    for (const e of [...ZONES, ...DIVINE_EGGS]) this.eggThumb(e);
   }
 
   /** Queue a hatch cinematic. results: [{ species, egg }] */
@@ -116,7 +114,7 @@ export class Preview {
       return;
     }
     overlay.classList.remove('hidden');
-    info.innerHTML = `<div class="hint">Hatching ${item.egg.name}…</div>`;
+    info.innerHTML = `<div class="hint">Hatching ${item.egg.name} Egg…</div>`;
     this.clearRoot();
     const egg = this.makeEgg(item.egg);
     egg.scale.setScalar(2.0);
@@ -173,6 +171,7 @@ export class Preview {
       const ud = a.pet.userData;
       for (const w of ud.wings) w.g.rotation.z = w.s * Math.sin(rt * 12) * 0.5;
       if (ud.halo) ud.halo.rotation.z = rt;
+      animatePet(a.pet, rt, dt);
       this.rays.material.opacity = Math.min(0.85, rt * 2) * (a.rar.order >= 3 ? 1 : 0.6);
       this.rays.rotation.z += dt * (a.rar.order >= 5 ? 1.2 : 0.4);
       if (rt > 0.8) a.canSkip = true;
